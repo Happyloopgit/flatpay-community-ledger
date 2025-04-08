@@ -21,9 +21,24 @@ export const MFAChallenge = ({ onComplete }: MFAChallengeProps) => {
     setError(null);
 
     try {
-      // First create a challenge
-      // Remove the factorType from the challenge params as it's not expected in the type
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({});
+      // Get the factors first to obtain the factorId
+      const { data: factorData, error: factorError } = await supabase.auth.mfa.listFactors();
+      
+      if (factorError) {
+        throw factorError;
+      }
+
+      // Find the first verified TOTP factor
+      const totpFactor = factorData.totp.find(factor => factor.factor_type === 'totp');
+      
+      if (!totpFactor || !totpFactor.id) {
+        throw new Error("No TOTP factor found for verification");
+      }
+
+      // Create challenge with the factorId
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: totpFactor.id
+      });
 
       if (challengeError) {
         throw challengeError;
@@ -35,7 +50,7 @@ export const MFAChallenge = ({ onComplete }: MFAChallengeProps) => {
 
       // Then verify with the challenge id and user's TOTP code
       const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: challengeData.id,
+        factorId: totpFactor.id,
         challengeId: challengeData.id,
         code: totpCode,
       });
