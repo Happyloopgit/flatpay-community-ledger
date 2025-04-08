@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +19,7 @@ import {
   Calendar
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AddExpenseModal } from "@/components/expenses/AddExpenseModal";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -180,9 +180,7 @@ const Dashboard = () => {
           <Button>
             <FileText className="h-4 w-4 mr-2" /> Generate Bills
           </Button>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" /> Add Expense
-          </Button>
+          <AddExpenseModal />
         </div>
       </div>
 
