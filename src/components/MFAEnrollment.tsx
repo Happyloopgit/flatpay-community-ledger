@@ -7,12 +7,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
+import { AlertCircle } from "lucide-react";
 
 interface MFAEnrollmentProps {
   onEnrollmentComplete?: () => void;
 }
 
 export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
+  const [isLoading, setIsLoading] = useState(true);
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
@@ -21,23 +23,52 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
   const [factorId, setFactorId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isEnrolled, setIsEnrolled] = useState(false);
+  const [existingFactorId, setExistingFactorId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user already has MFA enabled
-    const checkMFAStatus = async () => {
+    // Check if user already has MFA factors set up
+    const checkExistingFactors = async () => {
+      setIsLoading(true);
       try {
-        const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-        if (error) {
-          console.error("Error checking MFA status:", error);
-          return;
+        // First check if user has any existing factors
+        const { data: factorData, error: factorError } = await supabase.auth.mfa.listFactors();
+        
+        if (factorError) {
+          console.error("Error checking MFA factors:", factorError);
+          throw factorError;
         }
-        setIsEnrolled(data.currentLevel === "aal2");
+        
+        // Look for existing TOTP factor
+        const existingFactor = factorData.totp.find(factor => 
+          factor.factor_type === 'totp' && factor.status === 'verified'
+        );
+        
+        if (existingFactor) {
+          console.log("Found existing verified TOTP factor:", existingFactor.id);
+          setIsEnrolled(true);
+          setExistingFactorId(existingFactor.id);
+        } else {
+          // Also check the AAL level as a fallback
+          const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          if (aalError) {
+            console.error("Error checking MFA AAL status:", aalError);
+          } else {
+            setIsEnrolled(aalData?.currentLevel === "aal2");
+          }
+        }
       } catch (err) {
-        console.error("Error in checkMFAStatus:", err);
+        console.error("Error in checkExistingFactors:", err);
+        toast({
+          title: "Error checking MFA status",
+          description: err instanceof Error ? err.message : "Failed to check MFA enrollment status",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     
-    checkMFAStatus();
+    checkExistingFactors();
   }, []);
 
   const handleStartEnrollment = async () => {
@@ -45,9 +76,27 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
     setError(null);
 
     try {
+      // Check again for existing factors to prevent race conditions
+      const { data: checkData, error: checkError } = await supabase.auth.mfa.listFactors();
+      
+      if (checkError) {
+        throw checkError;
+      }
+      
+      // Verify no existing TOTP factor before proceeding
+      const existingFactor = checkData.totp.find(factor => 
+        factor.factor_type === 'totp' && (factor.status === 'verified' || factor.status === 'unverified')
+      );
+      
+      if (existingFactor) {
+        throw new Error("You already have MFA configured for this account");
+      }
+
+      // If no existing factor, proceed with enrollment
       const { data, error } = await supabase.auth.mfa.enroll({
         factorType: "totp",
         issuer: "FlatPay",
+        friendlyName: "FlatPay MFA",
       });
 
       if (error) {
@@ -68,6 +117,7 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
         description: err instanceof Error ? err.message : "Failed to start MFA enrollment",
         variant: "destructive",
       });
+      setIsEnrolling(false);
     }
   };
 
@@ -92,7 +142,7 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
         throw error;
       }
 
-      // Get the current user's ID first
+      // Get the current user's ID
       const { data: userData, error: userError } = await supabase.auth.getUser();
       
       if (userError || !userData.user) {
@@ -107,9 +157,13 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
 
       if (updateError) {
         console.error("Failed to update profile:", updateError);
+        // We don't throw here because the MFA is technically enabled even if the profile update fails
       }
 
       setIsEnrolled(true);
+      setQrCode(null);
+      setSecret(null);
+      setTotpCode("");
       toast({
         title: "MFA Enabled",
         description: "Two-factor authentication is now active on your account",
@@ -131,6 +185,30 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
   };
 
   const handleDisableMFA = async () => {
+    if (!existingFactorId) {
+      // Try to fetch the factor ID if we don't have it
+      try {
+        const { data, error } = await supabase.auth.mfa.listFactors();
+        if (error || !data) {
+          throw error || new Error("Could not retrieve MFA factors");
+        }
+        
+        const factor = data.totp.find(f => f.status === 'verified');
+        if (!factor || !factor.id) {
+          throw new Error("No active MFA factor found");
+        }
+        
+        setExistingFactorId(factor.id);
+      } catch (err) {
+        toast({
+          title: "Error",
+          description: err instanceof Error ? err.message : "Failed to retrieve MFA factors",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     // This would need to be implemented based on your security requirements
     // Typically requires password verification or other security checks
     toast({
@@ -138,6 +216,18 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
       description: "MFA removal requires additional security measures",
     });
   };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="flex justify-center">
+            <div className="text-center">Loading MFA status...</div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (isEnrolled) {
     return (
@@ -226,6 +316,7 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
 
               {error && (
                 <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
                   <AlertDescription>{error}</AlertDescription>
                 </Alert>
               )}
