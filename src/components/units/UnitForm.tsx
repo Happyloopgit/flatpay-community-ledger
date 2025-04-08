@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+// Define the input schema (what we expect from the form inputs)
 const unitSchema = z.object({
   unit_number: z.string().min(1, "Unit number is required"),
   size_sqft: z.string().transform((val) => (val === "" ? null : parseFloat(val)))
@@ -28,6 +29,14 @@ const unitSchema = z.object({
   occupancy_status: z.enum(["vacant", "occupied"])
 });
 
+// Define a separate type for the form inputs specifically
+type UnitFormInputs = {
+  unit_number: string;
+  size_sqft: string; // This matches the expected input type (string)
+  occupancy_status: "vacant" | "occupied";
+};
+
+// The transformed output type from the schema
 type UnitFormValues = z.infer<typeof unitSchema>;
 
 interface UnitFormProps {
@@ -41,7 +50,7 @@ interface UnitFormProps {
 }
 
 const UnitForm = ({ onSubmit, initialData, isSubmitting }: UnitFormProps) => {
-  const form = useForm<UnitFormValues>({
+  const form = useForm<UnitFormInputs>({
     resolver: zodResolver(unitSchema),
     defaultValues: {
       unit_number: initialData?.unit_number || "",
