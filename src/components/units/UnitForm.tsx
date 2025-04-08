@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Define the input schema (what we expect from the form inputs)
+// Define the schema that validates form inputs
 const unitSchema = z.object({
   unit_number: z.string().min(1, "Unit number is required"),
   size_sqft: z.string().transform((val) => (val === "" ? null : parseFloat(val)))
@@ -29,18 +29,18 @@ const unitSchema = z.object({
   occupancy_status: z.enum(["vacant", "occupied"])
 });
 
-// Define a separate type for the form inputs specifically
+// For form inputs, we need string types for all fields
 type UnitFormInputs = {
   unit_number: string;
-  size_sqft: string; // This matches the expected input type (string)
+  size_sqft: string; // String input from the form
   occupancy_status: "vacant" | "occupied";
 };
 
-// The transformed output type from the schema
+// This is the type after zod transform/validation
 type UnitFormValues = z.infer<typeof unitSchema>;
 
 interface UnitFormProps {
-  onSubmit: (values: UnitFormValues) => void;
+  onSubmit: (values: UnitFormValues) => void; // Expecting transformed values
   initialData?: {
     unit_number: string;
     size_sqft: number | null;
@@ -50,6 +50,7 @@ interface UnitFormProps {
 }
 
 const UnitForm = ({ onSubmit, initialData, isSubmitting }: UnitFormProps) => {
+  // Use UnitFormInputs for the form state
   const form = useForm<UnitFormInputs>({
     resolver: zodResolver(unitSchema),
     defaultValues: {
@@ -59,9 +60,15 @@ const UnitForm = ({ onSubmit, initialData, isSubmitting }: UnitFormProps) => {
     }
   });
 
+  // The handleSubmit will pass the transformed data (UnitFormValues) to onSubmit
+  const handleFormSubmit = form.handleSubmit((data) => {
+    // The zodResolver already transformed the data to match UnitFormValues
+    onSubmit(data as unknown as UnitFormValues);
+  });
+
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleFormSubmit} className="space-y-6">
         <FormField
           control={form.control}
           name="unit_number"
