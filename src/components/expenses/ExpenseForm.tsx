@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -33,6 +34,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { Database } from "@/integrations/supabase/types";
+
+// Define a custom type for expense insertion that omits the auto-generated fields
+type ExpenseInsert = Omit<
+  Database["public"]["Tables"]["expenses"]["Insert"],
+  "entered_by_profile_id" | "id" | "created_at" | "updated_at"
+>;
 
 const expenseFormSchema = z.object({
   expense_date: z.date({
@@ -86,7 +94,8 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
     try {
       setIsSubmitting(true);
       
-      const expenseData = {
+      // Create an object that matches our custom ExpenseInsert type
+      const expenseData: ExpenseInsert = {
         society_id: profile.society_id,
         expense_date: format(data.expense_date, "yyyy-MM-dd"),
         category: data.category,
