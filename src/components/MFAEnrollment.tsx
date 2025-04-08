@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "@/hooks/use-toast";
 import { QRCodeSVG } from "qrcode.react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 interface MFAEnrollmentProps {
   onEnrollmentComplete?: () => void;
@@ -117,6 +117,7 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
         description: err instanceof Error ? err.message : "Failed to start MFA enrollment",
         variant: "destructive",
       });
+    } finally {
       setIsEnrolling(false);
     }
   };
@@ -221,8 +222,9 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
     return (
       <Card>
         <CardContent className="pt-6">
-          <div className="flex justify-center">
-            <div className="text-center">Loading MFA status...</div>
+          <div className="flex justify-center p-4">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <span className="ml-2">Loading MFA status...</span>
           </div>
         </CardContent>
       </Card>
@@ -270,7 +272,14 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
               </AlertDescription>
             </Alert>
             <Button onClick={handleStartEnrollment} disabled={isEnrolling}>
-              {isEnrolling ? "Setting up..." : "Enable Two-Factor Authentication"}
+              {isEnrolling ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Setting up...
+                </>
+              ) : (
+                "Enable Two-Factor Authentication"
+              )}
             </Button>
           </div>
         )}
@@ -323,7 +332,14 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
             </div>
 
             <Button type="submit" className="w-full" disabled={isVerifying || totpCode.length !== 6}>
-              {isVerifying ? "Verifying..." : "Verify and Enable"}
+              {isVerifying ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Verifying...
+                </>
+              ) : (
+                "Verify and Enable"
+              )}
             </Button>
           </form>
         )}
