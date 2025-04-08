@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,7 +34,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Define the form schema with validation rules
 const expenseFormSchema = z.object({
   expense_date: z.date({
     required_error: "Expense date is required",
@@ -64,7 +62,6 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, profile } = useAuth();
 
-  // Initialize the form with default values
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: {
@@ -99,7 +96,7 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
         is_allocated_to_bill: false, // Default to false
       };
 
-      const { error } = await supabase.from("expenses").insert([expenseData]);
+      const { error } = await supabase.from("expenses").insert(expenseData);
 
       if (error) throw error;
 
@@ -125,7 +122,6 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {/* Expense Date */}
         <FormField
           control={form.control}
           name="expense_date"
@@ -166,7 +162,6 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
           )}
         />
 
-        {/* Category */}
         <FormField
           control={form.control}
           name="category"
@@ -181,7 +176,6 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
           )}
         />
 
-        {/* Description */}
         <FormField
           control={form.control}
           name="description"
@@ -199,7 +193,6 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
           )}
         />
 
-        {/* Amount */}
         <FormField
           control={form.control}
           name="amount"
@@ -220,7 +213,6 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
           )}
         />
 
-        {/* Allocation Rule */}
         <FormField
           control={form.control}
           name="allocation_rule"
@@ -246,14 +238,12 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
           )}
         />
 
-        {/* Future: Receipt Upload Placeholder */}
         <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
           <p className="text-sm text-muted-foreground">
             Receipt Upload (Coming Soon)
           </p>
         </div>
 
-        {/* Buttons */}
         <div className="flex justify-end space-x-2 pt-4">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel}>

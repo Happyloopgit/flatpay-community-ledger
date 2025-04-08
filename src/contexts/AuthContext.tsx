@@ -4,9 +4,22 @@ import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 
+// Define the profile interface
+interface Profile {
+  id: string;
+  name: string;
+  society_id: number | null;
+  role: string;
+  phone_number: string | null;
+  two_factor_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 type AuthContextType = {
   session: Session | null;
   user: User | null;
+  profile: Profile | null;
   loading: boolean;
   error: Error | null;
   signIn: (email: string, password: string) => Promise<{
@@ -24,9 +37,32 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const navigate = useNavigate();
+
+  // Fetch profile data when user changes
+  const fetchProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return;
+      }
+
+      if (data) {
+        setProfile(data);
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -34,6 +70,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          // We need to use setTimeout to avoid Supabase deadlocks
+          setTimeout(() => {
+            fetchProfile(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
         
         // Redirect user based on auth state
         if (event === "SIGNED_IN" && window.location.pathname === "/login") {
@@ -48,6 +93,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      }
+      
       setLoading(false);
       
       if (error) {
@@ -127,6 +177,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       value={{
         session,
         user,
+        profile,
         loading,
         error,
         signIn,
