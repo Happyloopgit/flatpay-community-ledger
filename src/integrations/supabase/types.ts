@@ -369,7 +369,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_expense: {
+        Args: {
+          p_society_id: number
+          p_expense_date: string
+          p_category: string
+          p_description: string
+          p_amount: number
+          p_allocation_rule?: string
+          p_is_allocated_to_bill?: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

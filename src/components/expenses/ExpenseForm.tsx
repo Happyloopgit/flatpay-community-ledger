@@ -37,10 +37,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Database } from "@/integrations/supabase/types";
 
 // Define a custom type for expense insertion that omits the auto-generated fields
-// but includes entered_by_profile_id since it's required by the database
+// We no longer need to include entered_by_profile_id since it's handled by the database function
 type ExpenseInsert = Omit<
   Database["public"]["Tables"]["expenses"]["Insert"],
-  "id" | "created_at" | "updated_at"
+  "id" | "created_at" | "updated_at" | "entered_by_profile_id"
 >;
 
 const expenseFormSchema = z.object({
@@ -95,19 +95,16 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
     try {
       setIsSubmitting(true);
       
-      // Create an object that includes all required fields including entered_by_profile_id
-      const expenseData: ExpenseInsert = {
-        society_id: profile.society_id,
-        expense_date: format(data.expense_date, "yyyy-MM-dd"),
-        category: data.category,
-        description: data.description || null,
-        amount: parseFloat(data.amount),
-        allocation_rule: data.allocation_rule,
-        is_allocated_to_bill: false, // Default to false
-        entered_by_profile_id: user.id, // Add this field with the current user's ID
-      };
-
-      const { error } = await supabase.from("expenses").insert(expenseData);
+      // Use the create_expense RPC function instead of direct insert
+      const { data: result, error } = await supabase.rpc('create_expense', {
+        p_society_id: profile.society_id,
+        p_expense_date: format(data.expense_date, "yyyy-MM-dd"),
+        p_category: data.category,
+        p_description: data.description || null,
+        p_amount: parseFloat(data.amount),
+        p_allocation_rule: data.allocation_rule,
+        p_is_allocated_to_bill: false
+      });
 
       if (error) throw error;
 
