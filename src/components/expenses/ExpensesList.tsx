@@ -7,7 +7,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { Trash } from "lucide-react";
+import { Trash, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -19,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import { EditExpenseModal } from "@/components/expenses/EditExpenseModal";
 
 interface Expense {
   id: number;
@@ -26,8 +27,9 @@ interface Expense {
   category: string;
   description: string | null;
   amount: number;
+  allocation_rule: string;
   entered_by_profile_id: string;
-  entered_by_name: string; // Added field for the user name
+  entered_by_name: string;
   created_at: string;
 }
 
@@ -39,6 +41,7 @@ export function ExpensesList() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
 
   useEffect(() => {
     const fetchExpenses = async () => {
@@ -164,6 +167,10 @@ export function ExpensesList() {
     setDeleteDialogOpen(true);
   };
 
+  const handleEditClick = (expense: Expense) => {
+    setExpenseToEdit(expense);
+  };
+
   const handleConfirmDelete = async () => {
     if (!expenseToDelete) return;
     
@@ -244,7 +251,7 @@ export function ExpensesList() {
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Entered By</TableHead> 
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    <TableHead className="w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -260,15 +267,26 @@ export function ExpensesList() {
                       </TableCell>
                       <TableCell>{expense.entered_by_name}</TableCell>
                       <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8"
-                          onClick={() => handleDeleteClick(expense)}
-                        >
-                          <Trash className="h-4 w-4 text-destructive" />
-                          <span className="sr-only">Delete expense</span>
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleEditClick(expense)}
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Edit expense</span>
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8"
+                            onClick={() => handleDeleteClick(expense)}
+                          >
+                            <Trash className="h-4 w-4 text-destructive" />
+                            <span className="sr-only">Delete expense</span>
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -310,6 +328,14 @@ export function ExpensesList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {expenseToEdit && (
+        <EditExpenseModal 
+          expense={expenseToEdit} 
+          isOpen={!!expenseToEdit}
+          onClose={() => setExpenseToEdit(null)}
+        />
+      )}
     </>
   );
 }

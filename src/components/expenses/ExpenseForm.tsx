@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,7 +37,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Database } from "@/integrations/supabase/types";
 
 // Define a custom type for expense insertion that omits the auto-generated fields
-// We no longer need to include entered_by_profile_id since it's handled by the database function
 type ExpenseInsert = Omit<
   Database["public"]["Tables"]["expenses"]["Insert"],
   "id" | "created_at" | "updated_at" | "entered_by_profile_id"
@@ -52,6 +51,14 @@ interface CreateExpenseArgs {
   p_amount: number;
   p_allocation_rule: string;
   p_is_allocated_to_bill: boolean;
+}
+
+interface UpdateExpenseArgs {
+  expense_date: string;
+  category: string;
+  description: string | null;
+  amount: number;
+  allocation_rule: string;
 }
 
 const expenseFormSchema = z.object({
@@ -72,16 +79,27 @@ const expenseFormSchema = z.object({
 
 type ExpenseFormValues = z.infer<typeof expenseFormSchema>;
 
+interface Expense {
+  id: number;
+  expense_date: string;
+  category: string;
+  description: string | null;
+  amount: number;
+  allocation_rule: string;
+}
+
 interface ExpenseFormProps {
+  initialData?: Expense;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
+export function ExpenseForm({ initialData, onSuccess, onCancel }: ExpenseFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, profile, refreshProfile, loading } = useAuth();
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const isEditMode = !!initialData;
 
   // Add effect to ensure profile is loaded and has society_id
   useEffect(() => {
@@ -98,14 +116,19 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
     }
   }, [user, profile, refreshProfile, loading]);
 
+  // Set up form with default values or initial data for editing
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
     defaultValues: {
-      expense_date: new Date(),
-      category: "",
-      description: "",
-      amount: "",
-      allocation_rule: "dont_allocate",
+      expense_date: initialData 
+        ? parseISO(initialData.expense_date) 
+        : new Date(),
+      category: initialData?.category || "",
+      description: initialData?.description || "",
+      amount: initialData 
+        ? initialData.amount.toString() 
+        : "",
+      allocation_rule: (initialData?.allocation_rule as "dont_allocate" | "allocate_equal_all") || "dont_allocate",
     },
   });
 
@@ -132,36 +155,62 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
     try {
       setIsSubmitting(true);
       
-      // Create explicitly typed arguments object for the RPC call
-      const rpcArgs: CreateExpenseArgs = {
-        p_society_id: Number(profile.society_id),
-        p_expense_date: format(data.expense_date, "yyyy-MM-dd"),
-        p_category: data.category,
-        p_description: data.description || null,
-        p_amount: parseFloat(data.amount),
-        p_allocation_rule: data.allocation_rule,
-        p_is_allocated_to_bill: false
-      };
+      if (isEditMode && initialData) {
+        // Update existing expense
+        const updateData: UpdateExpenseArgs = {
+          expense_date: format(data.expense_date, "yyyy-MM-dd"),
+          category: data.category,
+          description: data.description || null,
+          amount: parseFloat(data.amount),
+          allocation_rule: data.allocation_rule
+        };
 
-      console.log("Submitting expense with args:", rpcArgs);
+        console.log("Updating expense with data:", updateData);
 
-      // Use the create_expense RPC function with typed arguments
-      const { data: result, error } = await supabase.rpc('create_expense', rpcArgs);
+        const { error } = await supabase
+          .from('expenses')
+          .update(updateData)
+          .eq('id', initialData.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      toast({
-        title: "Expense Added",
-        description: "Your expense has been successfully recorded",
-      });
+        toast({
+          title: "Expense Updated",
+          description: "Your expense has been successfully updated",
+        });
+      } else {
+        // Create new expense
+        // Create explicitly typed arguments object for the RPC call
+        const rpcArgs: CreateExpenseArgs = {
+          p_society_id: Number(profile.society_id),
+          p_expense_date: format(data.expense_date, "yyyy-MM-dd"),
+          p_category: data.category,
+          p_description: data.description || null,
+          p_amount: parseFloat(data.amount),
+          p_allocation_rule: data.allocation_rule,
+          p_is_allocated_to_bill: false
+        };
+
+        console.log("Submitting expense with args:", rpcArgs);
+
+        // Use the create_expense RPC function with typed arguments
+        const { data: result, error } = await supabase.rpc('create_expense', rpcArgs);
+
+        if (error) throw error;
+
+        toast({
+          title: "Expense Added",
+          description: "Your expense has been successfully recorded",
+        });
+      }
       
       form.reset();
       if (onSuccess) onSuccess();
     } catch (error: any) {
-      console.error("Error adding expense:", error);
+      console.error(`Error ${isEditMode ? 'updating' : 'adding'} expense:`, error);
       toast({
         title: "Error",
-        description: error.message || "Failed to add expense. Please try again.",
+        description: error.message || `Failed to ${isEditMode ? 'update' : 'add'} expense. Please try again.`,
         variant: "destructive",
       });
     } finally {
@@ -318,7 +367,9 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
             type="submit" 
             disabled={isSubmitting || !profile?.society_id}
           >
-            {isSubmitting ? "Saving..." : "Save Expense"}
+            {isSubmitting 
+              ? `${isEditMode ? "Updating" : "Saving"}...` 
+              : `${isEditMode ? "Update" : "Save"} Expense`}
           </Button>
         </div>
       </form>
