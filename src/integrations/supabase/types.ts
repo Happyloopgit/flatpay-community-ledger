@@ -381,6 +381,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_current_user_profile_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

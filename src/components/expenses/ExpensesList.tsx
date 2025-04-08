@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +15,7 @@ interface Expense {
   description: string | null;
   amount: number;
   entered_by_profile_id: string;
+  entered_by_name: string; // Added field for the user name
   created_at: string;
 }
 
@@ -32,9 +34,13 @@ export function ExpensesList() {
 
       try {
         setLoading(true);
+        // Updated query to join with profiles table
         const { data, error } = await supabase
           .from("expenses")
-          .select("*")
+          .select(`
+            *,
+            profiles:entered_by_profile_id(name)
+          `)
           .eq("society_id", profile.society_id)
           .order("expense_date", { ascending: false })
           .limit(100);
@@ -48,7 +54,13 @@ export function ExpensesList() {
           throw error;
         }
 
-        setExpenses(data || []);
+        // Process the data to extract the profile name
+        const processedData = data?.map(item => ({
+          ...item,
+          entered_by_name: item.profiles?.name || "Unknown User"
+        })) || [];
+        
+        setExpenses(processedData);
       } catch (error) {
         console.error("Error fetching expenses:", error);
       } finally {
@@ -87,9 +99,13 @@ export function ExpensesList() {
             });
           }
           
+          // Refresh data with the joined query
           supabase
             .from("expenses")
-            .select("*")
+            .select(`
+              *,
+              profiles:entered_by_profile_id(name)
+            `)
             .eq("society_id", profile.society_id)
             .order("expense_date", { ascending: false })
             .limit(100)
@@ -102,7 +118,14 @@ export function ExpensesList() {
                 });
                 return;
               }
-              if (data) setExpenses(data);
+              if (data) {
+                // Process the data to extract the profile name
+                const processedData = data.map(item => ({
+                  ...item,
+                  entered_by_name: item.profiles?.name || "Unknown User"
+                }));
+                setExpenses(processedData);
+              }
             });
         }
       )
@@ -162,6 +185,7 @@ export function ExpensesList() {
                   <TableHead>Category</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
+                  <TableHead>Entered By</TableHead> {/* Added column for the user name */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -175,6 +199,7 @@ export function ExpensesList() {
                     <TableCell className="text-right font-medium">
                       {formatCurrency(expense.amount)}
                     </TableCell>
+                    <TableCell>{expense.entered_by_name}</TableCell> {/* Display the user name */}
                   </TableRow>
                 ))}
               </TableBody>
