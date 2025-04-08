@@ -92,11 +92,18 @@ export const MFAEnrollment = ({ onEnrollmentComplete }: MFAEnrollmentProps) => {
         throw error;
       }
 
+      // Get the current user's ID first
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !userData.user) {
+        throw userError || new Error("Could not retrieve user information");
+      }
+
       // Update the user's profile to mark MFA as enabled
       const { error: updateError } = await supabase
         .from("profiles")
         .update({ two_factor_enabled: true })
-        .eq("id", (await supabase.auth.getUser()).data.user?.id);
+        .eq("id", userData.user.id);
 
       if (updateError) {
         console.error("Failed to update profile:", updateError);

@@ -22,9 +22,8 @@ export const MFAChallenge = ({ onComplete }: MFAChallengeProps) => {
 
     try {
       // First create a challenge
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorType: 'totp'
-      });
+      // Remove the factorType from the challenge params as it's not expected in the type
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({});
 
       if (challengeError) {
         throw challengeError;
