@@ -5,12 +5,21 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import Index from "./pages/Index";
+import { Suspense } from "react";
+
+// Page imports
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import { Suspense } from "react";
+import Dashboard from "./pages/Dashboard";
+import Society from "./pages/Society";
+import Residents from "./pages/Residents";
+import Expenses from "./pages/Expenses";
+import Billing from "./pages/Billing";
+
+// Layout imports
+import MainLayout from "./components/layout/MainLayout";
 
 const queryClient = new QueryClient();
 
@@ -47,10 +56,16 @@ const Root = () => (
           <Route path="/register" element={<Register />} />
         </Route>
 
-        {/* Protected routes */}
+        {/* Protected routes - MainLayout */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Index />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route element={<MainLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/society" element={<Society />} />
+            <Route path="/residents" element={<Residents />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/billing" element={<Billing />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
         </Route>
 
         {/* Catch-all route */}
