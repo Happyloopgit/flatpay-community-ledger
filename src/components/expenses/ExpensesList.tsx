@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,7 +5,7 @@ import { format } from "date-fns";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface Expense {
   id: number;
@@ -60,7 +59,6 @@ export function ExpensesList() {
     fetchExpenses();
   }, [profile?.society_id, toast]);
 
-  // Subscribe to realtime changes for expenses table
   useEffect(() => {
     if (!profile?.society_id) return;
 
@@ -72,7 +70,6 @@ export function ExpensesList() {
         (payload) => {
           console.log("Expense change received:", payload);
           
-          // Show toast notification based on event type
           if (payload.eventType === "INSERT") {
             toast({
               title: "New expense added",
@@ -90,7 +87,6 @@ export function ExpensesList() {
             });
           }
           
-          // Refresh the expenses list
           supabase
             .from("expenses")
             .select("*")
