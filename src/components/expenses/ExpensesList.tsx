@@ -7,6 +7,18 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { Trash } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "@/components/ui/alert-dialog";
 
 interface Expense {
   id: number;
@@ -24,6 +36,9 @@ export function ExpensesList() {
   const [loading, setLoading] = useState(true);
   const { profile } = useAuth();
   const { toast } = useToast();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const fetchExpenses = async () => {
@@ -144,6 +159,48 @@ export function ExpensesList() {
     }).format(amount);
   };
 
+  const handleDeleteClick = (expense: Expense) => {
+    setExpenseToDelete(expense);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!expenseToDelete) return;
+    
+    setDeleteLoading(true);
+    
+    try {
+      const { error } = await supabase
+        .from("expenses")
+        .delete()
+        .eq("id", expenseToDelete.id);
+      
+      if (error) {
+        toast({
+          title: "Error deleting expense",
+          description: error.message,
+          variant: "destructive",
+        });
+        throw error;
+      }
+      
+      toast({
+        title: "Expense deleted",
+        description: "The expense has been deleted successfully.",
+      });
+      
+      // The realtime subscription should handle removing the item from the list,
+      // but we'll also manually update the state for immediate feedback
+      setExpenses(expenses.filter(expense => expense.id !== expenseToDelete.id));
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+    } finally {
+      setDeleteLoading(false);
+      setDeleteDialogOpen(false);
+      setExpenseToDelete(null);
+    }
+  };
+
   if (!profile?.society_id) {
     return (
       <Card>
@@ -161,52 +218,98 @@ export function ExpensesList() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Expenses</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : expenses.length === 0 ? (
-          <div className="text-center py-6 text-muted-foreground">
-            No expenses recorded yet
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Entered By</TableHead> {/* Added column for the user name */}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {expenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>
-                      {format(new Date(expense.expense_date), "dd MMM yyyy")}
-                    </TableCell>
-                    <TableCell>{expense.category}</TableCell>
-                    <TableCell>{expense.description || "-"}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatCurrency(expense.amount)}
-                    </TableCell>
-                    <TableCell>{expense.entered_by_name}</TableCell> {/* Display the user name */}
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Expenses</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
+          ) : expenses.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              No expenses recorded yet
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Category</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Entered By</TableHead> 
+                    <TableHead className="w-[80px]">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </TableHeader>
+                <TableBody>
+                  {expenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell>
+                        {format(new Date(expense.expense_date), "dd MMM yyyy")}
+                      </TableCell>
+                      <TableCell>{expense.category}</TableCell>
+                      <TableCell>{expense.description || "-"}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(expense.amount)}
+                      </TableCell>
+                      <TableCell>{expense.entered_by_name}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8"
+                          onClick={() => handleDeleteClick(expense)}
+                        >
+                          <Trash className="h-4 w-4 text-destructive" />
+                          <span className="sr-only">Delete expense</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this expense?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {expenseToDelete && (
+                <>
+                  This will delete the expense 
+                  {expenseToDelete.description 
+                    ? <span className="font-medium"> "{expenseToDelete.description}"</span> 
+                    : ""} 
+                  {" "}of amount{" "}
+                  <span className="font-medium">{formatCurrency(expenseToDelete.amount)}</span>.
+                  <br />
+                  This action cannot be undone.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete}
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLoading ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
