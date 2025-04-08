@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -79,7 +80,23 @@ interface ExpenseFormProps {
 export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { user, profile } = useAuth();
+  const { user, profile, refreshProfile, loading } = useAuth();
+  const [profileLoaded, setProfileLoaded] = useState(false);
+
+  // Add effect to ensure profile is loaded and has society_id
+  useEffect(() => {
+    const checkProfile = async () => {
+      if (user && !profile?.society_id) {
+        console.log("Profile missing or has no society_id, refreshing...");
+        await refreshProfile();
+      }
+      setProfileLoaded(true);
+    };
+
+    if (!loading) {
+      checkProfile();
+    }
+  }, [user, profile, refreshProfile, loading]);
 
   const form = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseFormSchema),
@@ -93,12 +110,22 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
   });
 
   async function onSubmit(data: ExpenseFormValues) {
-    if (!user || !profile?.society_id) {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to add expenses",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!profile?.society_id) {
       toast({
         title: "Error",
         description: "You must be logged in with a society assigned to add expenses",
         variant: "destructive",
       });
+      console.error("Missing society_id in profile:", profile);
       return;
     }
 
@@ -115,6 +142,8 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
         p_allocation_rule: data.allocation_rule,
         p_is_allocated_to_bill: false
       };
+
+      console.log("Submitting expense with args:", rpcArgs);
 
       // Use the create_expense RPC function with typed arguments
       const { data: result, error } = await supabase.rpc('create_expense', rpcArgs);
@@ -140,9 +169,23 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
     }
   }
 
+  // Show loading state while profile is being loaded
+  if (!profileLoaded) {
+    return <div className="flex justify-center p-4">Loading profile data...</div>;
+  }
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {/* Display alert if no society is assigned */}
+        {profileLoaded && !profile?.society_id && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+            <p className="text-yellow-700">
+              You don't have a society assigned to your account. Please contact your administrator.
+            </p>
+          </div>
+        )}
+        
         <FormField
           control={form.control}
           name="expense_date"
@@ -271,7 +314,10 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
               Cancel
             </Button>
           )}
-          <Button type="submit" disabled={isSubmitting}>
+          <Button 
+            type="submit" 
+            disabled={isSubmitting || !profile?.society_id}
+          >
             {isSubmitting ? "Saving..." : "Save Expense"}
           </Button>
         </div>
