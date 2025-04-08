@@ -16,6 +16,7 @@ import {
   Receipt,
   DollarSign,
   Settings,
+  Home,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,11 @@ const navigationItems = [
     name: "Society", 
     icon: <Building2 className="h-5 w-5" />, 
     path: "/society" 
+  },
+  { 
+    name: "Units", 
+    icon: <Home className="h-5 w-5" />, 
+    path: "/units" 
   },
   { 
     name: "Residents", 

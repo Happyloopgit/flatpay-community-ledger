@@ -17,6 +17,7 @@ import Society from "./pages/Society";
 import Residents from "./pages/Residents";
 import Expenses from "./pages/Expenses";
 import Billing from "./pages/Billing";
+import Units from "./pages/Units";
 
 // Layout imports
 import MainLayout from "./components/layout/MainLayout";
@@ -64,6 +65,7 @@ const Root = () => (
             <Route path="/residents" element={<Residents />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/billing" element={<Billing />} />
+            <Route path="/units" element={<Units />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
