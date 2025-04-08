@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +41,17 @@ type ExpenseInsert = Omit<
   Database["public"]["Tables"]["expenses"]["Insert"],
   "id" | "created_at" | "updated_at" | "entered_by_profile_id"
 >;
+
+// Define explicit type for create_expense RPC function arguments
+interface CreateExpenseArgs {
+  p_society_id: number;
+  p_expense_date: string; // 'YYYY-MM-DD' format
+  p_category: string;
+  p_description: string | null;
+  p_amount: number;
+  p_allocation_rule: string;
+  p_is_allocated_to_bill: boolean;
+}
 
 const expenseFormSchema = z.object({
   expense_date: z.date({
@@ -95,16 +105,19 @@ export function ExpenseForm({ onSuccess, onCancel }: ExpenseFormProps) {
     try {
       setIsSubmitting(true);
       
-      // Use the create_expense RPC function instead of direct insert
-      const { data: result, error } = await supabase.rpc('create_expense', {
-        p_society_id: profile.society_id,
+      // Create explicitly typed arguments object for the RPC call
+      const rpcArgs: CreateExpenseArgs = {
+        p_society_id: Number(profile.society_id),
         p_expense_date: format(data.expense_date, "yyyy-MM-dd"),
         p_category: data.category,
         p_description: data.description || null,
         p_amount: parseFloat(data.amount),
         p_allocation_rule: data.allocation_rule,
         p_is_allocated_to_bill: false
-      });
+      };
+
+      // Use the create_expense RPC function with typed arguments
+      const { data: result, error } = await supabase.rpc('create_expense', rpcArgs);
 
       if (error) throw error;
 
