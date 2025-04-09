@@ -20,27 +20,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Define the schema that validates form inputs
+// Define the schema for form validation
 const unitSchema = z.object({
   unit_number: z.string().min(1, "Unit number is required"),
-  size_sqft: z.string().transform((val) => (val === "" ? null : parseFloat(val)))
-    .refine((val) => val === null || !isNaN(val), "Must be a valid number")
-    .nullable(),
+  size_sqft: z.union([
+    z.string().transform((val) => {
+      if (val === "") return null;
+      const parsed = parseFloat(val);
+      return isNaN(parsed) ? null : parsed;
+    }),
+    z.number().nullable()
+  ]).nullable(),
   occupancy_status: z.enum(["vacant", "occupied"])
 });
 
-// For form inputs, we need string types for all fields
-type UnitFormInputs = {
-  unit_number: string;
-  size_sqft: string; // String input from the form
-  occupancy_status: "vacant" | "occupied";
-};
-
-// This is the type after zod transform/validation
+// This represents the output type after zod transformation
 type UnitFormValues = z.infer<typeof unitSchema>;
 
 interface UnitFormProps {
-  onSubmit: (values: UnitFormValues) => void; // Expecting transformed values
+  onSubmit: (values: UnitFormValues) => void;
   initialData?: {
     unit_number: string;
     size_sqft: number | null;
@@ -50,25 +48,18 @@ interface UnitFormProps {
 }
 
 const UnitForm = ({ onSubmit, initialData, isSubmitting }: UnitFormProps) => {
-  // Use UnitFormInputs for the form state
-  const form = useForm<UnitFormInputs>({
+  const form = useForm<UnitFormValues>({
     resolver: zodResolver(unitSchema),
     defaultValues: {
       unit_number: initialData?.unit_number || "",
-      size_sqft: initialData?.size_sqft !== null ? String(initialData.size_sqft) : "",
+      size_sqft: initialData?.size_sqft ?? null,
       occupancy_status: (initialData?.occupancy_status as "vacant" | "occupied") || "vacant"
     }
   });
 
-  // The handleSubmit will pass the transformed data (UnitFormValues) to onSubmit
-  const handleFormSubmit = form.handleSubmit((data) => {
-    // The zodResolver already transformed the data to match UnitFormValues
-    onSubmit(data as unknown as UnitFormValues);
-  });
-
   return (
     <Form {...form}>
-      <form onSubmit={handleFormSubmit} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
           name="unit_number"
@@ -90,7 +81,15 @@ const UnitForm = ({ onSubmit, initialData, isSubmitting }: UnitFormProps) => {
             <FormItem>
               <FormLabel>Size (sq ft)</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="e.g. 1200" {...field} />
+                <Input 
+                  type="number" 
+                  placeholder="e.g. 1200" 
+                  value={field.value === null ? "" : field.value}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    field.onChange(val === "" ? null : parseFloat(val));
+                  }}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
