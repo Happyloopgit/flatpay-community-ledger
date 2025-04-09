@@ -326,8 +326,41 @@ export type Database = {
         }
         Relationships: []
       }
+      society_blocks: {
+        Row: {
+          block_name: string
+          created_at: string
+          id: string
+          society_id: number
+          updated_at: string
+        }
+        Insert: {
+          block_name: string
+          created_at?: string
+          id?: string
+          society_id: number
+          updated_at?: string
+        }
+        Update: {
+          block_name?: string
+          created_at?: string
+          id?: string
+          society_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "society_blocks_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
+          block_id: string | null
           created_at: string
           id: number
           occupancy_status: string | null
@@ -337,6 +370,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          block_id?: string | null
           created_at?: string
           id?: number
           occupancy_status?: string | null
@@ -346,6 +380,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          block_id?: string | null
           created_at?: string
           id?: number
           occupancy_status?: string | null
@@ -355,6 +390,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "units_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "society_blocks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "units_society_id_fkey"
             columns: ["society_id"]

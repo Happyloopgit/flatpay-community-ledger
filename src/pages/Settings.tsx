@@ -1,10 +1,15 @@
 
-import { MFAEnrollment } from "@/components/MFAEnrollment";
-import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
+import { ProfileTab } from "@/components/settings/ProfileTab";
+import { BlocksTab } from "@/components/settings/BlocksTab";
+import { UnitsTab } from "@/components/settings/UnitsTab";
+import { ResidentsTab } from "@/components/settings/ResidentsTab";
+import { MFAEnrollment } from "@/components/MFAEnrollment";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -22,7 +27,7 @@ const Settings = () => {
   return (
     <div className="container mx-auto py-10 space-y-8">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Account Settings</h1>
+        <h1 className="text-3xl font-bold">Society Settings</h1>
         <Button variant="outline" onClick={handleLogout}>
           Sign Out
         </Button>
@@ -31,22 +36,30 @@ const Settings = () => {
       <div className="grid gap-8">
         <Card>
           <CardHeader>
-            <CardTitle>Profile Information</CardTitle>
-            <CardDescription>Manage your account details</CardDescription>
+            <CardTitle>Society Management</CardTitle>
+            <CardDescription>Manage your society settings and configurations</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="font-medium">Email:</div>
-                <div className="col-span-2">{user?.email}</div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="font-medium">Last Sign In:</div>
-                <div className="col-span-2">
-                  {user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString() : "N/A"}
-                </div>
-              </div>
-            </div>
+            <Tabs defaultValue="profile" className="w-full">
+              <TabsList className="mb-6">
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+                <TabsTrigger value="blocks">Blocks</TabsTrigger>
+                <TabsTrigger value="units">Units</TabsTrigger>
+                <TabsTrigger value="residents">Residents</TabsTrigger>
+              </TabsList>
+              <TabsContent value="profile">
+                <ProfileTab />
+              </TabsContent>
+              <TabsContent value="blocks">
+                <BlocksTab />
+              </TabsContent>
+              <TabsContent value="units">
+                <UnitsTab />
+              </TabsContent>
+              <TabsContent value="residents">
+                <ResidentsTab />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
 
