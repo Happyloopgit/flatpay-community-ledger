@@ -10,6 +10,7 @@ import { toast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Edit, Trash2, Plus } from "lucide-react";
 
+// Define the Block type to match the society_blocks table structure
 interface Block {
   id: string;
   block_name: string;
@@ -63,7 +64,7 @@ export const BlocksTab = () => {
       
       const { data, error } = await supabase
         .from("society_blocks")
-        .insert([{ block_name, society_id: profile.society_id }])
+        .insert([{ block_name, society_id: profile.society_id }] as any)
         .select();
         
       if (error) {
@@ -101,7 +102,7 @@ export const BlocksTab = () => {
       
       const { error } = await supabase
         .from("society_blocks")
-        .update({ block_name: block.block_name })
+        .update({ block_name: block.block_name } as any)
         .eq("id", block.id);
         
       if (error) {
