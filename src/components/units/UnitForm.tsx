@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -20,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/supabase";
 
 type Block = Database['public']['Tables']['society_blocks']['Row'];
@@ -76,7 +75,7 @@ const UnitForm = ({ onSubmit, initialData, isSubmitting, societyId }: UnitFormPr
       try {
         const { data, error } = await supabase
           .from("society_blocks")
-          .select("id, block_name")
+          .select("*")
           .eq("society_id", societyId)
           .order("block_name");
           
