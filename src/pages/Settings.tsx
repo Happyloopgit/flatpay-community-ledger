@@ -9,6 +9,7 @@ import { ProfileTab } from "@/components/settings/ProfileTab";
 import { BlocksTab } from "@/components/settings/BlocksTab";
 import { UnitsTab } from "@/components/settings/UnitsTab";
 import { ResidentsTab } from "@/components/settings/ResidentsTab";
+import { ChargesTab } from "@/components/settings/ChargesTab";
 import { MFAEnrollment } from "@/components/MFAEnrollment";
 
 const Settings = () => {
@@ -46,6 +47,7 @@ const Settings = () => {
                 <TabsTrigger value="blocks">Blocks</TabsTrigger>
                 <TabsTrigger value="units">Units</TabsTrigger>
                 <TabsTrigger value="residents">Residents</TabsTrigger>
+                <TabsTrigger value="charges">Charges</TabsTrigger>
               </TabsList>
               <TabsContent value="profile">
                 <ProfileTab />
@@ -58,6 +60,9 @@ const Settings = () => {
               </TabsContent>
               <TabsContent value="residents">
                 <ResidentsTab />
+              </TabsContent>
+              <TabsContent value="charges">
+                <ChargesTab />
               </TabsContent>
             </Tabs>
           </CardContent>

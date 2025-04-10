@@ -215,6 +215,50 @@ export type Database = {
           },
         ]
       }
+      recurring_charges: {
+        Row: {
+          amount_or_rate: number
+          calculation_type: string
+          charge_name: string
+          created_at: string
+          frequency: string
+          id: string
+          is_active: boolean
+          society_id: number
+          updated_at: string
+        }
+        Insert: {
+          amount_or_rate: number
+          calculation_type: string
+          charge_name: string
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          society_id: number
+          updated_at?: string
+        }
+        Update: {
+          amount_or_rate?: number
+          calculation_type?: string
+          charge_name?: string
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          society_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_charges_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       residents: {
         Row: {
           created_at: string
