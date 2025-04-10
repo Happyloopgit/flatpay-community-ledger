@@ -8,12 +8,16 @@ import {
   TableCell
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Phone } from "lucide-react";
+import { Phone, Pencil, ToggleRight, ToggleLeft } from "lucide-react";
 import { useResidents, ResidentFilter } from "@/hooks/useResidents";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
+import { Resident } from "@/hooks/useResidents";
+import { useToast } from "@/components/ui/use-toast";
+import EditResidentModal from "./EditResidentModal";
 
 interface ResidentsListProps {
   filter: ResidentFilter;
@@ -21,6 +25,10 @@ interface ResidentsListProps {
 
 const ResidentsList = ({ filter }: ResidentsListProps) => {
   const { residents, isLoading, refetch } = useResidents(filter);
+  const [editingResident, setEditingResident] = useState<number | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState<number | null>(null);
+  const { toast } = useToast();
 
   // Set up realtime subscription
   useEffect(() => {
@@ -59,6 +67,39 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
     };
   }, [refetch]);
 
+  const handleEditClick = (residentId: number) => {
+    setEditingResident(residentId);
+    setIsEditModalOpen(true);
+  };
+
+  const handleToggleActive = async (resident: Resident) => {
+    try {
+      setIsUpdatingStatus(resident.id);
+      
+      const newStatus = !resident.is_active;
+      const { error } = await supabase
+        .from('residents')
+        .update({ is_active: newStatus })
+        .eq('id', resident.id);
+
+      if (error) throw error;
+
+      toast({
+        title: `Resident ${newStatus ? 'activated' : 'deactivated'}`,
+        description: `${resident.name} has been ${newStatus ? 'activated' : 'deactivated'} successfully.`,
+      });
+    } catch (error) {
+      console.error("Error toggling resident status:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update resident status. Please try again.",
+      });
+    } finally {
+      setIsUpdatingStatus(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -86,8 +127,10 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Contact</TableHead>
+            <TableHead>Primary Unit</TableHead>
             <TableHead>Move In Date</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -106,6 +149,15 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
                 </div>
               </TableCell>
               <TableCell>
+                {resident.block_name && resident.unit_number ? (
+                  `${resident.block_name} - ${resident.unit_number}`
+                ) : resident.unit_number ? (
+                  resident.unit_number
+                ) : (
+                  <span className="text-muted-foreground">N/A</span>
+                )}
+              </TableCell>
+              <TableCell>
                 {resident.move_in_date ? format(new Date(resident.move_in_date), 'MMM d, yyyy') : 'Not set'}
               </TableCell>
               <TableCell>
@@ -113,10 +165,43 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
                   {resident.is_active ? "Active" : "Inactive"}
                 </Badge>
               </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleEditClick(resident.id)}
+                    title="Edit resident"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggleActive(resident)}
+                    disabled={isUpdatingStatus === resident.id}
+                    title={resident.is_active ? "Deactivate resident" : "Activate resident"}
+                  >
+                    {resident.is_active ? (
+                      <ToggleRight className="h-4 w-4" />
+                    ) : (
+                      <ToggleLeft className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
+      
+      {editingResident && (
+        <EditResidentModal
+          open={isEditModalOpen}
+          onOpenChange={setIsEditModalOpen}
+          residentId={editingResident}
+        />
+      )}
     </div>
   );
 };

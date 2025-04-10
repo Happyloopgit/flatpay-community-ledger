@@ -60,17 +60,18 @@ const EditResidentModal = ({ open, onOpenChange, residentId }: EditResidentModal
     setIsSubmitting(true);
     
     try {
-      // Convert dates to ISO strings for Supabase
-      const dataToUpdate = {
-        ...values,
-        move_in_date: values.move_in_date ? values.move_in_date.toISOString() : null,
-        move_out_date: values.move_out_date ? values.move_out_date.toISOString() : null,
-      };
-
-      const { error } = await supabase
-        .from("residents")
-        .update(dataToUpdate)
-        .eq("id", residentId);
+      // Use the update_resident RPC function
+      const { data, error } = await supabase.rpc('update_resident', {
+        p_resident_id: residentId,
+        p_name: values.name,
+        p_phone_number: values.phone_number,
+        p_email: values.email,
+        p_primary_unit_id: values.primary_unit_id,
+        p_move_in_date: values.move_in_date ? values.move_in_date.toISOString() : null,
+        p_move_out_date: values.move_out_date ? values.move_out_date.toISOString() : null,
+        p_is_active: values.is_active,
+        p_whatsapp_opt_in: values.whatsapp_opt_in
+      });
 
       if (error) {
         throw error;
