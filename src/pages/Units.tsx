@@ -60,7 +60,14 @@ const Units = () => {
         setLoading(true);
         const { data, error } = await supabase
           .from('units')
-          .select('id, unit_number, size_sqft, occupancy_status')
+          .select(`
+            id, 
+            unit_number, 
+            size_sqft, 
+            occupancy_status, 
+            block_id,
+            block:society_blocks(block_name)
+          `)
           .eq('society_id', societyId)
           .order('unit_number', { ascending: true });
           
@@ -95,18 +102,8 @@ const Units = () => {
           (payload) => {
             console.log('Change received!', payload);
             
-            // Handle different event types
-            if (payload.eventType === 'INSERT') {
-              setUnits(current => [...current, payload.new]);
-            } else if (payload.eventType === 'UPDATE') {
-              setUnits(current => 
-                current.map(unit => unit.id === payload.new.id ? payload.new : unit)
-              );
-            } else if (payload.eventType === 'DELETE') {
-              setUnits(current => 
-                current.filter(unit => unit.id !== payload.old.id)
-              );
-            }
+            // When a change happens, we'll refetch all units to get updated data with block information
+            fetchUnits();
           }
         )
         .subscribe();

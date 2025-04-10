@@ -20,6 +20,10 @@ interface Unit {
   unit_number: string;
   size_sqft: number | null;
   occupancy_status: string;
+  block_id: string | null;
+  block: {
+    block_name: string | null;
+  } | null;
 }
 
 interface UnitsListProps {
@@ -99,6 +103,7 @@ const UnitsList = ({ units, loading, societyId }: UnitsListProps) => {
         <TableHeader>
           <TableRow>
             <TableHead>Unit Number</TableHead>
+            <TableHead>Block</TableHead>
             <TableHead>Size (sq ft)</TableHead>
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Actions</TableHead>
@@ -108,6 +113,7 @@ const UnitsList = ({ units, loading, societyId }: UnitsListProps) => {
           {units.map((unit) => (
             <TableRow key={unit.id}>
               <TableCell className="font-medium">{unit.unit_number}</TableCell>
+              <TableCell>{unit.block?.block_name || "N/A"}</TableCell>
               <TableCell>{unit.size_sqft || 'Not specified'}</TableCell>
               <TableCell>
                 <span className={`capitalize ${unit.occupancy_status === 'vacant' ? 'text-green-600' : 'text-blue-600'}`}>

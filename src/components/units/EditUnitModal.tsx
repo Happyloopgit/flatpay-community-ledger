@@ -19,6 +19,7 @@ interface EditUnitModalProps {
     unit_number: string;
     size_sqft: number | null;
     occupancy_status: string;
+    block_id: string | null;
   };
   societyId: number;
 }
@@ -36,7 +37,8 @@ const EditUnitModal = ({ isOpen, onClose, onSuccess, unit, societyId }: EditUnit
         .update({
           unit_number: values.unit_number,
           size_sqft: values.size_sqft,
-          occupancy_status: values.occupancy_status
+          occupancy_status: values.occupancy_status,
+          block_id: values.block_id
         })
         .eq('id', unit.id)
         .eq('society_id', societyId);
@@ -66,6 +68,7 @@ const EditUnitModal = ({ isOpen, onClose, onSuccess, unit, societyId }: EditUnit
           onSubmit={handleSubmit}
           initialData={unit}
           isSubmitting={isSubmitting}
+          societyId={societyId}
         />
       </DialogContent>
     </Dialog>

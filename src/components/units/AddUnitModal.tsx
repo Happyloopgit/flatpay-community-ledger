@@ -32,7 +32,8 @@ const AddUnitModal = ({ isOpen, onClose, onUnitAdded, societyId }: AddUnitModalP
             society_id: societyId,
             unit_number: values.unit_number,
             size_sqft: values.size_sqft,
-            occupancy_status: values.occupancy_status
+            occupancy_status: values.occupancy_status,
+            block_id: values.block_id
           }
         ])
         .select()
@@ -62,6 +63,7 @@ const AddUnitModal = ({ isOpen, onClose, onUnitAdded, societyId }: AddUnitModalP
         <UnitForm 
           onSubmit={handleSubmit}
           isSubmitting={isSubmitting}
+          societyId={societyId}
         />
       </DialogContent>
     </Dialog>
