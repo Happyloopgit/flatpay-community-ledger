@@ -8,16 +8,18 @@ import {
   TableCell
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Pencil, ToggleRight, ToggleLeft } from "lucide-react";
+import { Phone, Pencil, Trash2 } from "lucide-react";
 import { useResidents, ResidentFilter } from "@/hooks/useResidents";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Resident } from "@/hooks/useResidents";
 import { useToast } from "@/components/ui/use-toast";
 import EditResidentModal from "./EditResidentModal";
+import DeleteResidentModal from "./DeleteResidentModal";
 
 interface ResidentsListProps {
   filter: ResidentFilter;
@@ -27,6 +29,8 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
   const { residents, isLoading, refetch } = useResidents(filter);
   const [editingResident, setEditingResident] = useState<number | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [deletingResident, setDeletingResident] = useState<number | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState<number | null>(null);
   const { toast } = useToast();
 
@@ -75,11 +79,15 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
     setIsEditModalOpen(true);
   };
 
-  const handleToggleActive = async (resident: Resident) => {
+  const handleDeleteClick = (residentId: number) => {
+    setDeletingResident(residentId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleToggleActive = async (resident: Resident, newStatus: boolean) => {
     try {
       setIsUpdatingStatus(resident.id);
       
-      const newStatus = !resident.is_active;
       const { error } = await supabase
         .from('residents')
         .update({ is_active: newStatus })
@@ -178,18 +186,21 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
                   >
                     <Pencil className="h-4 w-4" />
                   </Button>
+                  <Switch
+                    checked={!!resident.is_active}
+                    onCheckedChange={(checked) => handleToggleActive(resident, checked)}
+                    disabled={isUpdatingStatus === resident.id}
+                    aria-label={resident.is_active ? "Deactivate resident" : "Activate resident"}
+                    className="ml-2"
+                  />
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleToggleActive(resident)}
-                    disabled={isUpdatingStatus === resident.id}
-                    title={resident.is_active ? "Deactivate resident" : "Activate resident"}
+                    onClick={() => handleDeleteClick(resident.id)}
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    title="Delete resident"
                   >
-                    {resident.is_active ? (
-                      <ToggleRight className="h-4 w-4" />
-                    ) : (
-                      <ToggleLeft className="h-4 w-4" />
-                    )}
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </TableCell>
@@ -203,6 +214,14 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
           open={isEditModalOpen}
           onOpenChange={setIsEditModalOpen}
           residentId={editingResident}
+        />
+      )}
+
+      {deletingResident && (
+        <DeleteResidentModal
+          open={isDeleteModalOpen}
+          onOpenChange={setIsDeleteModalOpen}
+          residentId={deletingResident}
         />
       )}
     </div>
