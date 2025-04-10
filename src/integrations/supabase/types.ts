@@ -423,6 +423,20 @@ export type Database = {
         }
         Returns: Json
       }
+      create_resident: {
+        Args: {
+          p_society_id: number
+          p_name: string
+          p_phone_number: string
+          p_email?: string
+          p_primary_unit_id?: number
+          p_move_in_date?: string
+          p_move_out_date?: string
+          p_is_active?: boolean
+          p_whatsapp_opt_in?: boolean
+        }
+        Returns: Json
+      }
       get_current_user_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string

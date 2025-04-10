@@ -1,5 +1,4 @@
 
-import { useState } from "react";
 import {
   Table,
   TableHeader,
@@ -9,19 +8,9 @@ import {
   TableCell
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger
-} from "@/components/ui/dropdown-menu";
-import { Pencil, MoreVertical, Trash2, Phone } from "lucide-react";
+import { Phone } from "lucide-react";
 import { useResidents, ResidentFilter } from "@/hooks/useResidents";
 import { format } from "date-fns";
-import EditResidentModal from "./EditResidentModal";
-import DeleteResidentModal from "./DeleteResidentModal";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ResidentsListProps {
@@ -30,16 +19,6 @@ interface ResidentsListProps {
 
 const ResidentsList = ({ filter }: ResidentsListProps) => {
   const { residents, isLoading } = useResidents(filter);
-  const [editingResident, setEditingResident] = useState<number | null>(null);
-  const [deletingResident, setDeletingResident] = useState<number | null>(null);
-
-  const handleEdit = (id: number) => {
-    setEditingResident(id);
-  };
-
-  const handleDelete = (id: number) => {
-    setDeletingResident(id);
-  };
 
   if (isLoading) {
     return (
@@ -67,22 +46,15 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
-            <TableHead>Unit</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Move In Date</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="w-[100px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {residents.map((resident) => (
             <TableRow key={resident.id}>
               <TableCell className="font-medium">{resident.name}</TableCell>
-              <TableCell>
-                {resident.unit_number ? 
-                  `${resident.block_name ? `${resident.block_name} - ` : ''}${resident.unit_number}` : 
-                  "No unit assigned"}
-              </TableCell>
               <TableCell>
                 <div className="flex flex-col space-y-1">
                   {resident.phone_number && (
@@ -102,50 +74,10 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
                   {resident.is_active ? "Active" : "Inactive"}
                 </Badge>
               </TableCell>
-              <TableCell>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <span className="sr-only">Open menu</span>
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuItem onClick={() => handleEdit(resident.id)}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDelete(resident.id)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
             </TableRow>
           ))}
         </TableBody>
       </Table>
-
-      {editingResident !== null && (
-        <EditResidentModal
-          residentId={editingResident}
-          open={!!editingResident}
-          onOpenChange={() => setEditingResident(null)}
-        />
-      )}
-
-      {deletingResident !== null && (
-        <DeleteResidentModal
-          residentId={deletingResident}
-          open={!!deletingResident}
-          onOpenChange={() => setDeletingResident(null)}
-        />
-      )}
     </div>
   );
 };

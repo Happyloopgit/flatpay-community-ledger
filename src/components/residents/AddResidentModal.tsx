@@ -21,17 +21,18 @@ const AddResidentModal = ({ open, onOpenChange }: AddResidentModalProps) => {
     setIsSubmitting(true);
     
     try {
-      // Convert dates to ISO strings for Supabase
-      const dataToInsert = {
-        ...values,
-        move_in_date: values.move_in_date ? values.move_in_date.toISOString() : null,
-        move_out_date: values.move_out_date ? values.move_out_date.toISOString() : null,
-        society_id: societyId
-      };
-
-      const { error } = await supabase
-        .from("residents")
-        .insert([dataToInsert]);
+      // Use RPC to call the create_resident database function
+      const { data, error } = await supabase.rpc('create_resident', {
+        p_society_id: societyId,
+        p_name: values.name,
+        p_phone_number: values.phone_number,
+        p_email: values.email || null,
+        p_primary_unit_id: values.primary_unit_id || null,
+        p_move_in_date: values.move_in_date ? values.move_in_date.toISOString() : null,
+        p_move_out_date: values.move_out_date ? values.move_out_date.toISOString() : null,
+        p_is_active: values.is_active !== undefined ? values.is_active : true,
+        p_whatsapp_opt_in: values.whatsapp_opt_in || false
+      });
 
       if (error) {
         throw error;
