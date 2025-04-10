@@ -35,12 +35,15 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
     // Hard-coded society_id to be replaced with dynamic value later
     const societyId = 1;
 
+    console.log('Setting up realtime subscription for residents');
+    
+    // Using the channel name 'residents-changes'
     const channel = supabase
       .channel('residents-changes')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
           schema: 'public',
           table: 'residents',
           filter: `society_id=eq.${societyId}`
