@@ -1,4 +1,3 @@
-
 export type Json =
   | string
   | number
@@ -421,6 +420,20 @@ export type Database = {
           p_amount: number
           p_allocation_rule?: string
           p_is_allocated_to_bill?: boolean
+        }
+        Returns: Json
+      }
+      create_resident: {
+        Args: {
+          p_society_id: number
+          p_name: string
+          p_phone_number: string
+          p_email?: string
+          p_primary_unit_id?: number
+          p_move_in_date?: string
+          p_move_out_date?: string
+          p_is_active?: boolean
+          p_whatsapp_opt_in?: boolean
         }
         Returns: Json
       }
