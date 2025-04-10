@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -36,9 +35,21 @@ type UnitOption = {
 };
 
 const residentSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .regex(
+      /^[a-zA-Z\s\-'.]+$/,
+      "Name should only contain letters, spaces, hyphens, and apostrophes"
+    ),
   email: z.string().email("Invalid email").optional().nullable(),
-  phone_number: z.string().min(10, "Phone number should be at least 10 digits"),
+  phone_number: z
+    .string()
+    .min(10, "Phone number should be at least 10 digits")
+    .regex(
+      /^[+\d\s()\-]+$/,
+      "Phone number should only contain digits, spaces, +, -, (, )"
+    ),
   primary_unit_id: z.number().nullable(),
   move_in_date: z.date().optional().nullable(),
   move_out_date: z.date().optional().nullable(),

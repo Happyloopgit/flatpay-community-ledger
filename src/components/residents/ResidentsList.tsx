@@ -12,13 +12,44 @@ import { Phone } from "lucide-react";
 import { useResidents, ResidentFilter } from "@/hooks/useResidents";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface ResidentsListProps {
   filter: ResidentFilter;
 }
 
 const ResidentsList = ({ filter }: ResidentsListProps) => {
-  const { residents, isLoading } = useResidents(filter);
+  const { residents, isLoading, refetch } = useResidents(filter);
+
+  // Set up realtime subscription
+  useEffect(() => {
+    // Hard-coded society_id to be replaced with dynamic value later
+    const societyId = 1;
+
+    const channel = supabase
+      .channel('residents-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'residents',
+          filter: `society_id=eq.${societyId}`
+        },
+        () => {
+          // Refetch the residents data when any changes happen
+          console.log('Realtime update received for residents, refetching data...');
+          refetch();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   if (isLoading) {
     return (
