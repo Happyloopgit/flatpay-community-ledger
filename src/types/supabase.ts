@@ -441,6 +441,20 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      update_resident: {
+        Args: {
+          p_resident_id: number
+          p_name: string
+          p_phone_number: string
+          p_email?: string
+          p_primary_unit_id?: number
+          p_move_in_date?: string
+          p_move_out_date?: string
+          p_is_active?: boolean
+          p_whatsapp_opt_in?: boolean
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
