@@ -6,7 +6,6 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
@@ -75,21 +74,18 @@ const EditResidentModal = ({ open, onOpenChange, residentId }: EditResidentModal
   const handleSubmit = async (formData: any) => {
     setIsSaving(true);
     try {
-      // Call the update_resident RPC function using normal from/update instead of rpc
-      // to avoid the type error while the types are being regenerated
-      const { error } = await supabase
-        .from('residents')
-        .update({
-          name: formData.name,
-          phone_number: formData.phone_number,
-          email: formData.email || null,
-          primary_unit_id: formData.primary_unit_id || null,
-          move_in_date: formData.move_in_date || null,
-          move_out_date: formData.move_out_date || null,
-          is_active: formData.is_active,
-          whatsapp_opt_in: formData.whatsapp_opt_in
-        })
-        .eq('id', residentId);
+      // Use the update_resident RPC function as intended
+      const { error } = await supabase.rpc('update_resident', {
+        p_resident_id: residentId,
+        p_name: formData.name,
+        p_phone_number: formData.phone_number,
+        p_email: formData.email || null,
+        p_primary_unit_id: formData.primary_unit_id || null,
+        p_move_in_date: formData.move_in_date || null,
+        p_move_out_date: formData.move_out_date || null,
+        p_is_active: formData.is_active,
+        p_whatsapp_opt_in: formData.whatsapp_opt_in
+      });
 
       if (error) throw error;
 
@@ -128,6 +124,7 @@ const EditResidentModal = ({ open, onOpenChange, residentId }: EditResidentModal
             initialData={residentData}
             onSubmit={handleSubmit}
             isSubmitting={isSaving}
+            societyId={residentData?.society_id}
             submitText="Update Resident"
           />
         )}

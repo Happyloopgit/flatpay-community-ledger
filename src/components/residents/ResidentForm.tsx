@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -75,6 +74,7 @@ interface ResidentFormProps {
   };
   isSubmitting: boolean;
   societyId: number;
+  submitText?: string; // Added submitText prop
 }
 
 const ResidentForm = ({
@@ -82,6 +82,7 @@ const ResidentForm = ({
   initialData,
   isSubmitting,
   societyId,
+  submitText = "Submit", // Default value if not provided
 }: ResidentFormProps) => {
   const [units, setUnits] = useState<UnitOption[]>([]);
   const [isLoadingUnits, setIsLoadingUnits] = useState(false);
@@ -356,7 +357,7 @@ const ResidentForm = ({
 
         <div className="flex justify-end gap-2">
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Saving..." : initialData ? "Save Changes" : "Add Resident"}
+            {isSubmitting ? "Saving..." : submitText}
           </Button>
         </div>
       </form>
