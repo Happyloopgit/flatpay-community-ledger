@@ -22,9 +22,11 @@ import {
 import { supabase } from "@/lib/supabase";
 import { Database } from "@/types/supabase";
 
-type Block = Database['public']['Tables']['society_blocks']['Row'];
+type BlockOption = {
+  id: string;
+  block_name: string;
+};
 
-// Define the schema for form validation
 const unitSchema = z.object({
   unit_number: z.string().min(1, "Unit number is required"),
   size_sqft: z.union([
@@ -39,7 +41,6 @@ const unitSchema = z.object({
   block_id: z.string().uuid().nullable()
 });
 
-// This represents the output type after zod transformation
 type UnitFormValues = z.infer<typeof unitSchema>;
 
 interface UnitFormProps {
@@ -55,7 +56,7 @@ interface UnitFormProps {
 }
 
 const UnitForm = ({ onSubmit, initialData, isSubmitting, societyId }: UnitFormProps) => {
-  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [blocks, setBlocks] = useState<BlockOption[]>([]);
   const [isLoadingBlocks, setIsLoadingBlocks] = useState(false);
 
   const form = useForm<UnitFormValues>({
@@ -68,14 +69,13 @@ const UnitForm = ({ onSubmit, initialData, isSubmitting, societyId }: UnitFormPr
     }
   });
 
-  // Fetch blocks when component mounts
   useEffect(() => {
     const fetchBlocks = async () => {
       setIsLoadingBlocks(true);
       try {
         const { data, error } = await supabase
           .from("society_blocks")
-          .select("*")
+          .select("id, block_name")
           .eq("society_id", societyId)
           .order("block_name");
           
