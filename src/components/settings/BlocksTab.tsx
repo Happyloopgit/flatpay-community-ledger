@@ -9,14 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { toast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Edit, Trash2, Plus } from "lucide-react";
+import { Database } from "@/types/supabase";
 
-// Define the Block type to match the society_blocks table structure
-interface Block {
-  id: string;
-  block_name: string;
-  society_id: number;
-  created_at: string;
-}
+type Block = Database['public']['Tables']['society_blocks']['Row'];
 
 interface BlockFormData {
   id?: string;
@@ -50,7 +45,7 @@ export const BlocksTab = () => {
         return [];
       }
       
-      return data as Block[];
+      return data;
     },
     enabled: !!profile?.society_id,
   });
@@ -64,7 +59,7 @@ export const BlocksTab = () => {
       
       const { data, error } = await supabase
         .from("society_blocks")
-        .insert([{ block_name, society_id: profile.society_id }] as any)
+        .insert([{ block_name, society_id: profile.society_id }])
         .select();
         
       if (error) {
@@ -102,7 +97,7 @@ export const BlocksTab = () => {
       
       const { error } = await supabase
         .from("society_blocks")
-        .update({ block_name: block.block_name } as any)
+        .update({ block_name: block.block_name })
         .eq("id", block.id);
         
       if (error) {
