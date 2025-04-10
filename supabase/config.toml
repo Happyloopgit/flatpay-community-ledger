@@ -1,1 +1,28 @@
+
 project_id = "ezxkzvjqbulajgwynbub"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+port = 54325
+
+[auth]
+port = 54326
+
+[realtime]
+port = 54327
+
+[functions.generate-invoices]
+verify_jwt = true
