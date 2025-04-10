@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -46,9 +47,10 @@ const residentSchema = z.object({
   phone_number: z
     .string()
     .min(10, "Phone number should be at least 10 digits")
-    .regex(
-      /^[+\d\s()\-]+$/,
-      "Phone number should only contain digits, spaces, +, -, (, )"
+    .transform(val => val.replace(/[\s()+-]/g, '')) // Remove formatting characters
+    .refine(
+      val => /^\d{10}$/.test(val) || /^\d{12}$/.test(val), 
+      "Phone number must contain exactly 10 digits (or 12 with country code)"
     ),
   primary_unit_id: z.number().nullable(),
   move_in_date: z.date().optional().nullable(),

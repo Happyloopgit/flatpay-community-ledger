@@ -37,13 +37,21 @@ const ResidentsList = ({ filter }: ResidentsListProps) => {
           table: 'residents',
           filter: `society_id=eq.${societyId}`
         },
-        () => {
-          // Refetch the residents data when any changes happen
-          console.log('Realtime update received for residents, refetching data...');
-          refetch();
+        (payload) => {
+          // Log the full payload for debugging
+          console.log('Realtime update received for residents:', payload);
+          
+          // Check for specific event types
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+            console.log(`Resident ${payload.eventType.toLowerCase()} detected, refetching data...`);
+            // Explicitly refetch to update the list
+            refetch();
+          }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+      });
 
     // Cleanup subscription on unmount
     return () => {
