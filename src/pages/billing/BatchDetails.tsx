@@ -34,6 +34,11 @@ type InvoiceBatch = {
   sent_at: string | null;
 };
 
+// Define a type for the finalize_batch RPC response
+interface FinalizeBatchResult extends InvoiceBatch {
+  updated_invoices: number;
+}
+
 const BatchDetails = () => {
   const { batchId } = useParams<{ batchId: string }>();
   const navigate = useNavigate();
@@ -147,17 +152,27 @@ const BatchDetails = () => {
     setIsProcessing(true);
     
     try {
+      // Convert batchId from string to number
+      const batchIdNumber = parseInt(batchId, 10);
+      
+      // Check if the conversion resulted in a valid number
+      if (isNaN(batchIdNumber)) {
+        throw new Error("Invalid batch ID");
+      }
+      
       const { data, error } = await supabase
-        .rpc('finalize_batch', { p_batch_id: parseInt(batchId) });
+        .rpc('finalize_batch', { p_batch_id: batchIdNumber });
       
       if (error) throw error;
       
-      console.log("Batch finalized successfully:", data);
+      // Use type assertion to access the updated_invoices property
+      const result = data as FinalizeBatchResult;
+      console.log("Batch finalized successfully:", result);
       
       // Show success toast
       toast({
         title: "Batch Finalized",
-        description: `Batch finalized successfully. ${data?.updated_invoices || 0} invoices marked as Pending.`,
+        description: `Batch finalized successfully. ${result.updated_invoices || 0} invoices marked as Pending.`,
       });
       
       // Refresh batch data to update UI

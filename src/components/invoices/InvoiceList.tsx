@@ -63,7 +63,7 @@ const InvoiceList = ({ filterBatchId }: InvoiceListProps) => {
       case "pending":
         return <Badge>Pending</Badge>;
       case "paid":
-        return <Badge variant="success">Paid</Badge>;
+        return <Badge variant="secondary">Paid</Badge>;
       case "overdue":
         return <Badge variant="destructive">Overdue</Badge>;
       case "cancelled":
