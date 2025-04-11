@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import ResidentForm, { ResidentFormValues } from "./ResidentForm";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface AddResidentModalProps {
   open: boolean;
@@ -35,7 +35,17 @@ const AddResidentModal = ({ open, onOpenChange }: AddResidentModalProps) => {
       });
 
       if (error) {
-        throw error;
+        // Improved error handling with specific messages based on error type
+        if (error.code === '23505' && error.message?.includes('residents_society_id_email_unique')) {
+          // Email uniqueness constraint violation
+          throw new Error("Email address already exists for this society.");
+        } else if (error.message?.includes("Unit") && error.message?.includes("already assigned")) {
+          // Unit assignment constraint from the database function
+          throw new Error(error.message);
+        } else {
+          // Generic error with original message
+          throw new Error(`Failed to add resident: ${error.message}`);
+        }
       }
 
       toast({
@@ -49,7 +59,7 @@ const AddResidentModal = ({ open, onOpenChange }: AddResidentModalProps) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add resident. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to add resident. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
