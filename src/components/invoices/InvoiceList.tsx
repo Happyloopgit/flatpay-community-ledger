@@ -208,7 +208,7 @@ const InvoiceList = () => {
               <TableCell>{formatUnitDisplay(invoice)}</TableCell>
               <TableCell>
                 {invoice.billing_period_start
-                  ? format(new Date(invoice.billing_period_start), "MMM d, yyyy")
+                  ? format(new Date(invoice.billing_period_start), "MMMM yyyy")
                   : "N/A"}
               </TableCell>
               <TableCell>
