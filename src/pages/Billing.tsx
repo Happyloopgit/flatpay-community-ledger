@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, FileText, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import InvoiceList from "@/components/invoices/InvoiceList";
 
 const Billing = () => {
   const { profile } = useAuth();
@@ -108,15 +109,16 @@ const Billing = () => {
         </CardContent>
       </Card>
 
-      {/* This section will be expanded later to show invoice history */}
+      {/* Invoices List Card */}
       <Card>
         <CardHeader>
           <CardTitle>Recent Invoices</CardTitle>
+          <CardDescription>
+            View and manage generated invoices for your society
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">
-            No invoices generated yet. Use the "Generate Invoices" button to create invoices for the current billing period.
-          </p>
+          <InvoiceList />
         </CardContent>
       </Card>
     </div>
