@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -29,6 +30,7 @@ type InvoiceBatch = {
 
 const InvoiceBatchList = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [invoiceBatches, setInvoiceBatches] = useState<InvoiceBatch[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,12 +131,9 @@ const InvoiceBatchList = () => {
     };
   }, [profile?.society_id]);
 
-  // Handle view details button click (placeholder for now)
+  // Handle view details button click - now navigates to the batch details page
   const handleViewDetails = (batchId: number) => {
-    toast({
-      title: "Info",
-      description: `Batch details functionality will be implemented in the next phase. (Batch ID: ${batchId})`,
-    });
+    navigate(`/billing/batches/${batchId}`);
   };
 
   if (isLoading && invoiceBatches.length === 0) {

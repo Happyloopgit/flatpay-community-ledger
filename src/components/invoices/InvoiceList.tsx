@@ -31,6 +31,10 @@ type Invoice = {
   block_name: string | null;
 };
 
+interface InvoiceListProps {
+  filterBatchId?: number;
+}
+
 // Helper function to format currency
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-IN", {
@@ -55,7 +59,7 @@ const getStatusBadgeVariant = (status: string) => {
   }
 };
 
-const InvoiceList = () => {
+const InvoiceList = ({ filterBatchId }: InvoiceListProps) => {
   const { profile } = useAuth();
   const societyId = profile?.society_id;
 
@@ -63,7 +67,7 @@ const InvoiceList = () => {
   const fetchInvoices = async () => {
     if (!societyId) throw new Error("Society ID not available");
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("invoices")
       .select(`
         id,
@@ -84,8 +88,16 @@ const InvoiceList = () => {
           )
         )
       `)
-      .eq("society_id", societyId)
-      .order("due_date", { ascending: false });
+      .eq("society_id", societyId);
+      
+    // Apply batch filter if provided
+    if (filterBatchId) {
+      query = query.eq("invoice_batch_id", filterBatchId);
+    }
+    
+    query = query.order("due_date", { ascending: false });
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -113,7 +125,7 @@ const InvoiceList = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["invoices", societyId],
+    queryKey: ["invoices", societyId, filterBatchId],
     queryFn: fetchInvoices,
     enabled: !!societyId,
   });
@@ -170,7 +182,10 @@ const InvoiceList = () => {
   if (!invoices || invoices.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
-        No invoices found. Generate invoices using the button above.
+        {filterBatchId 
+          ? "No invoices found in this batch."
+          : "No invoices found. Generate invoices using the button above."
+        }
       </div>
     );
   }
