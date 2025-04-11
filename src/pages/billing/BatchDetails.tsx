@@ -165,8 +165,13 @@ const BatchDetails = () => {
       
       if (error) throw error;
       
-      // Use type assertion to access the updated_invoices property
-      const result = data as FinalizeBatchResult;
+      // Check if data exists and is not an array
+      if (!data || Array.isArray(data)) {
+        throw new Error("Unexpected response format from server");
+      }
+      
+      // Use type assertion with unknown first for safety
+      const result = data as unknown as FinalizeBatchResult;
       console.log("Batch finalized successfully:", result);
       
       // Show success toast
