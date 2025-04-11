@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
@@ -79,6 +78,7 @@ const Billing = () => {
       setIsLoading(true);
       
       try {
+        // Using type-safe approach with proper table name
         const { data, error } = await supabase
           .from('invoice_batches')
           .select('id, status')
