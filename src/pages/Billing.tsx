@@ -1,12 +1,12 @@
+
 import { useState, useEffect } from "react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, FileText, AlertCircle, CalendarIcon, Check } from "lucide-react";
+import { Loader2, FileText, AlertCircle, CalendarIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import InvoiceList from "@/components/invoices/InvoiceList";
 import {
   Select,
   SelectContent,
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import InvoiceBatchList from "@/components/billing/InvoiceBatchList";
 
 const Billing = () => {
   const { profile } = useAuth();
@@ -78,7 +79,6 @@ const Billing = () => {
       setIsLoading(true);
       
       try {
-        // Using type-safe approach with proper table name
         const { data, error } = await supabase
           .from('invoice_batches')
           .select('id, status')
@@ -163,16 +163,6 @@ const Billing = () => {
     }
   };
 
-  const handleReviewDraftBatch = () => {
-    // Placeholder for future implementation
-    toast({
-      title: "Info",
-      description: "Review Draft Batch functionality will be implemented in the next phase.",
-    });
-  };
-
-  const billingPeriod = getBillingPeriodDates();
-
   // Render status badge based on batch status
   const renderStatusBadge = (status) => {
     switch (status) {
@@ -181,7 +171,7 @@ const Billing = () => {
       case 'Pending':
         return <Badge variant="default">Pending</Badge>;
       case 'Sent':
-        return <Badge variant="default">Sent</Badge>;
+        return <Badge>Sent</Badge>;
       default:
         return null;
     }
@@ -197,6 +187,8 @@ const Billing = () => {
         </Button>
       );
     }
+    
+    const billingPeriod = getBillingPeriodDates();
     
     if (!batchInfo) {
       return (
@@ -220,22 +212,7 @@ const Billing = () => {
       );
     }
     
-    if (batchInfo.status === 'Draft') {
-      return (
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button
-            onClick={handleReviewDraftBatch}
-            variant="default"
-            className="flex items-center gap-2"
-          >
-            <Check className="h-4 w-4" />
-            <span>Review Draft Batch for {billingPeriod.label}</span>
-          </Button>
-          {/* Cancel button placeholder - to be implemented later */}
-        </div>
-      );
-    }
-    
+    // If batch exists, just show status badge for now
     return (
       <div className="flex items-center gap-2">
         <span>Invoices {batchInfo.status} for {billingPeriod.label}</span>
@@ -305,7 +282,7 @@ const Billing = () => {
               <p className="text-muted-foreground">
                 Use the controls above to select a billing period and generate invoice batches.
                 {batchInfo && (
-                  <> Current status for {billingPeriod.label}: {renderStatusBadge(batchInfo.status)}</>
+                  <> Current status for {getBillingPeriodDates().label}: {renderStatusBadge(batchInfo.status)}</>
                 )}
               </p>
             </div>
@@ -313,16 +290,16 @@ const Billing = () => {
         </CardContent>
       </Card>
 
-      {/* Invoices List Card */}
+      {/* Invoice Batches List Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Invoices</CardTitle>
+          <CardTitle>Invoice Batches</CardTitle>
           <CardDescription>
-            View and manage generated invoices for your society
+            View and manage invoice batches for your society
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <InvoiceList />
+          <InvoiceBatchList />
         </CardContent>
       </Card>
     </div>
