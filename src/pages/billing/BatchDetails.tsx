@@ -9,6 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Loader2, ArrowLeft, CheckCircle2, Check, Send, XCircle } from "lucide-react";
 import InvoiceList from "@/components/invoices/InvoiceList";
 
@@ -32,6 +42,7 @@ const BatchDetails = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
 
   // Format currency
   const formatCurrency = (amount: number) => {
@@ -53,42 +64,43 @@ const BatchDetails = () => {
   };
 
   // Fetch batch data
-  useEffect(() => {
-    const fetchBatchData = async () => {
-      if (!batchId || !profile?.society_id) return;
-      
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const { data, error } = await supabase
-          .from("invoice_batches")
-          .select("*")
-          .eq("id", batchId)
-          .eq("society_id", profile.society_id)
-          .single();
-          
-        if (error) throw error;
-        
-        if (!data) {
-          setError("Invoice batch not found");
-          return;
-        }
-        
-        setBatch(data);
-      } catch (err: any) {
-        console.error("Error fetching invoice batch:", err);
-        setError(err.message || "Failed to load invoice batch details");
-        toast({
-          title: "Error",
-          description: "Could not load batch details",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchBatchData = async () => {
+    if (!batchId || !profile?.society_id) return;
     
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const { data, error } = await supabase
+        .from("invoice_batches")
+        .select("*")
+        .eq("id", batchId)
+        .eq("society_id", profile.society_id)
+        .single();
+        
+      if (error) throw error;
+      
+      if (!data) {
+        setError("Invoice batch not found");
+        return;
+      }
+      
+      setBatch(data);
+    } catch (err: any) {
+      console.error("Error fetching invoice batch:", err);
+      setError(err.message || "Failed to load invoice batch details");
+      toast({
+        title: "Error",
+        description: "Could not load batch details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Initial data fetch
+  useEffect(() => {
     fetchBatchData();
   }, [batchId, profile?.society_id]);
 
@@ -128,13 +140,39 @@ const BatchDetails = () => {
     };
   }, [batchId, navigate]);
 
-  // Placeholder functions for batch actions
-  const handleFinalizeBatch = () => {
-    // This is just a placeholder for now - logic will be implemented in the next step
-    toast({
-      title: "Coming Soon",
-      description: "Batch finalization will be implemented in the next step.",
-    });
+  // Handle finalize batch
+  const handleFinalizeBatch = async () => {
+    if (!batchId) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const { data, error } = await supabase
+        .rpc('finalize_batch', { p_batch_id: parseInt(batchId) });
+      
+      if (error) throw error;
+      
+      console.log("Batch finalized successfully:", data);
+      
+      // Show success toast
+      toast({
+        title: "Batch Finalized",
+        description: `Batch finalized successfully. ${data?.updated_invoices || 0} invoices marked as Pending.`,
+      });
+      
+      // Refresh batch data to update UI
+      fetchBatchData();
+    } catch (err: any) {
+      console.error("Error finalizing batch:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to finalize batch",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      setShowFinalizeDialog(false);
+    }
   };
   
   const handleCancelBatch = () => {
@@ -178,11 +216,15 @@ const BatchDetails = () => {
         return (
           <div className="flex flex-wrap gap-2">
             <Button 
-              onClick={handleFinalizeBatch}
+              onClick={() => setShowFinalizeDialog(true)}
               className="gap-1"
               disabled={isProcessing}
             >
-              <Check className="h-4 w-4" />
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
               Finalize Batch
             </Button>
             <Button 
@@ -280,9 +322,33 @@ const BatchDetails = () => {
           </div>
           
           <h2 className="text-xl font-semibold mb-4">Invoices in this Batch</h2>
-          <InvoiceList filterBatchId={batch.id} />
+          <InvoiceList filterBatchId={Number(batchId)} />
         </CardContent>
       </Card>
+
+      {/* Finalize Confirmation Dialog */}
+      <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize Invoice Batch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to finalize this batch? Associated invoices will be marked as Pending.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleFinalizeBatch}
+              disabled={isProcessing}
+              className="gap-1"
+            >
+              {isProcessing && <Loader2 className="h-4 w-4 animate-spin" />}
+              Yes, Finalize
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
