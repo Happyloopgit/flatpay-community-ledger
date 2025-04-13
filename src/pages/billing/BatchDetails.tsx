@@ -69,40 +69,61 @@ const BatchDetails = () => {
   };
 
   // Fetch batch data
-  const fetchBatchData = async () => {
-    if (!batchId || !profile?.society_id) return;
-    
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const { data, error } = await supabase
-        .from("invoice_batches")
-        .select("*")
-        .eq("id", batchId)
-        .eq("society_id", profile.society_id)
-        .single();
-        
-      if (error) throw error;
+const fetchBatchData = async () => {
+  if (!batchId || !profile?.society_id) return;
+
+  // --- START: Added Conversion & Check ---
+  const numericBatchId = parseInt(batchId, 10); 
+  if (isNaN(numericBatchId)) {
+      console.error("Invalid Batch ID parameter:", batchId);
+      setError("Invalid Batch ID in URL.");
+      setIsLoading(false); // Make sure to stop loading if ID is invalid
+      toast({ title: "Error", description: "Invalid Batch ID.", variant: "destructive" });
+      return; 
+  }
+  // --- END: Added Conversion & Check ---
+  
+  setIsLoading(true);
+  setError(null); // Reset error before fetch
+  
+  try {
+    const { data, error } = await supabase
+      .from("invoice_batches")
+      .select("*")
+      .eq("id", numericBatchId) // <--- Use the converted numeric ID here
+      .eq("society_id", profile.society_id)
+      .single();
       
-      if (!data) {
-        setError("Invoice batch not found");
-        return;
-      }
-      
-      setBatch(data);
-    } catch (err: any) {
-      console.error("Error fetching invoice batch:", err);
-      setError(err.message || "Failed to load invoice batch details");
+    if (error) throw error; // Throw if Supabase returns an error
+    
+    if (!data) {
+      // If no data and no error, it means not found for this user/society
+      setError("Invoice batch not found or access denied."); 
+      setBatch(null); // Clear any previous batch data
       toast({
-        title: "Error",
-        description: "Could not load batch details",
+        title: "Not Found",
+        description: "Invoice batch not found.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
+    
+    setBatch(data); // Set the found batch data
+  } catch (err: any) {
+    // Catch errors from the try block (Supabase errors or the !data error)
+    console.error("Error fetching invoice batch:", err);
+    setError(err.message || "Failed to load invoice batch details");
+    setBatch(null); // Clear batch data on error
+    // Toast might be redundant if error is already set and displayed, but can keep
+    toast({
+      title: "Error",
+      description: err.message || "Could not load batch details",
+      variant: "destructive",
+    });
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Initial data fetch
   useEffect(() => {
@@ -145,55 +166,68 @@ const BatchDetails = () => {
     };
   }, [batchId, navigate]);
 
-  // Handle finalize batch
-  const handleFinalizeBatch = async () => {
-    if (!batchId) return;
+// Handle finalize batch
+const handleFinalizeBatch = async () => {
+  // --- START: Added Conversion & Check at the beginning ---
+  if (!batchId || typeof batchId !== 'string') { 
+    console.error("Finalize failed: Batch ID is missing or invalid.");
+    toast({ title: "Error", description: "Cannot finalize: Invalid Batch ID.", variant: "destructive" });
+    setShowFinalizeDialog(false); // Close dialog on error
+    return; 
+  }
+  const numericBatchId = parseInt(batchId, 10);
+  if (isNaN(numericBatchId)) {
+    console.error("Finalize failed: Invalid Batch ID format:", batchId);
+    toast({ title: "Error", description: "Invalid Batch ID format.", variant: "destructive" });
+    setShowFinalizeDialog(false); // Close dialog on error
+    return; 
+  }
+  // --- END: Added Conversion & Check ---
+
+  setIsProcessing(true);
+  
+  try {
+    // Now call RPC with the guaranteed number
+    const { data, error } = await supabase
+      .rpc('finalize_batch', { p_batch_id: numericBatchId }); // <-- Use numericBatchId
     
-    setIsProcessing(true);
+    if (error) throw error; // Throw Supabase error to catch block
     
-    try {
-      // Convert batchId from string to number
-      const batchIdNumber = parseInt(batchId, 10);
-      
-      // Check if the conversion resulted in a valid number
-      if (isNaN(batchIdNumber)) {
-        throw new Error("Invalid batch ID");
-      }
-      
-      const { data, error } = await supabase
-        .rpc('finalize_batch', { p_batch_id: batchIdNumber });
-      
-      if (error) throw error;
-      
-      // Check if data exists and is not an array
-      if (!data || Array.isArray(data)) {
-        throw new Error("Unexpected response format from server");
-      }
-      
-      // Use type assertion with unknown first for safety
-      const result = data as unknown as FinalizeBatchResult;
-      console.log("Batch finalized successfully:", result);
-      
-      // Show success toast
-      toast({
-        title: "Batch Finalized",
-        description: `Batch finalized successfully. ${result.updated_invoices || 0} invoices marked as Pending.`,
-      });
-      
-      // Refresh batch data to update UI
-      fetchBatchData();
-    } catch (err: any) {
-      console.error("Error finalizing batch:", err);
-      toast({
-        title: "Error",
-        description: err.message || "Failed to finalize batch",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-      setShowFinalizeDialog(false);
+    // --- START: Added Explicit Check before Assertion ---
+    if (!data || Array.isArray(data)) {
+      // This case means the RPC succeeded but returned unexpected data
+      console.error("Unexpected response format from finalize_batch:", data);
+      throw new Error("Received unexpected response from server after finalizing.");
     }
-  };
+    // --- END: Added Explicit Check ---
+
+    // Type assertion is now safer
+    const result = data as unknown as FinalizeBatchResult; 
+    console.log("Batch finalized successfully:", result);
+    
+    // Show success toast (with optional chaining for safety)
+    toast({
+      title: "Batch Finalized",
+      description: `Batch finalized successfully. ${result?.updated_invoices || 0} invoices marked as Pending.`, 
+    });
+    
+    // Refresh batch data to update UI AFTER success
+    fetchBatchData(); 
+
+  } catch (err: any) {
+    // Catch errors from the try block (Supabase errors or thrown errors)
+    console.error("Error finalizing batch:", err);
+    toast({
+      title: "Error Finalizing Batch",
+      description: err.message || "Failed to finalize batch. Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    // This runs regardless of success or error
+    setIsProcessing(false);
+    setShowFinalizeDialog(false); // Ensure dialog closes
+  }
+};
   
   const handleCancelBatch = () => {
     // This is just a placeholder for now - logic will be implemented later
