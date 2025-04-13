@@ -570,6 +570,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_batch: {
+        Args: { p_batch_id: number }
+        Returns: Json
+      }
       create_expense: {
         Args: {
           p_society_id: number
