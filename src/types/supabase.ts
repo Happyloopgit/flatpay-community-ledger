@@ -69,69 +69,6 @@ export type Database = {
           },
         ]
       }
-      invoice_batches: {
-        Row: {
-          id: number
-          society_id: number
-          billing_period_start: string
-          billing_period_end: string
-          status: string
-          total_invoice_count: number
-          total_amount: number
-          generated_at: string
-          finalized_at: string | null
-          sent_at: string | null
-          generated_by_profile_id: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          society_id: number
-          billing_period_start: string
-          billing_period_end: string
-          status?: string
-          total_invoice_count?: number
-          total_amount?: number
-          generated_at?: string
-          finalized_at?: string | null
-          sent_at?: string | null
-          generated_by_profile_id: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          society_id?: number
-          billing_period_start?: string
-          billing_period_end?: string
-          status?: string
-          total_invoice_count?: number
-          total_amount?: number
-          generated_at?: string
-          finalized_at?: string | null
-          sent_at?: string | null
-          generated_by_profile_id?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_batches_generated_by_profile_id_fkey"
-            columns: ["generated_by_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_batches_society_id_fkey"
-            columns: ["society_id"]
-            isOneToOne: false
-            referencedRelation: "societies"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       invoices: {
         Row: {
           amount_paid: number | null
@@ -541,12 +478,6 @@ export type Database = {
           p_move_out_date?: string
           p_is_active?: boolean
           p_whatsapp_opt_in?: boolean
-        }
-        Returns: Json
-      }
-      finalize_batch: {
-        Args: {
-          p_batch_id: number
         }
         Returns: Json
       }

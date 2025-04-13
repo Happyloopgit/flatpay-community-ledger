@@ -240,38 +240,8 @@ serve(async (req: Request) => {
     const formattedGenerationDate = generationDate.toISOString().split('T')[0];
     const formattedDueDate = dueDate.toISOString().split('T')[0];
 
-    // Create a new invoice batch
-    const { data: newBatch, error: batchError } = await supabase
-      .from('invoice_batches')
-      .insert({
-        society_id: society_id,
-        billing_period_start: billing_period_start,
-        billing_period_end: billing_period_end,
-        status: 'Draft',
-        generated_by_profile_id: profile.id,
-        total_invoice_count: 0,  // Will update this after processing
-        total_amount: 0.00       // Will update this after processing
-      })
-      .select('id')
-      .single();
-
-    if (batchError || !newBatch) {
-      console.error("Error creating invoice batch:", batchError);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: `Error creating invoice batch: ${batchError?.message || "Unknown error"}` 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const new_batch_id = newBatch.id;
-    console.log(`Created new invoice batch with ID: ${new_batch_id}`);
-
     // Counter for created invoices
     let createdInvoiceCount = 0;
-    let totalAmount = 0;
     const failedInvoices: { residentId: number, reason: string }[] = [];
 
     // Loop through residents and create invoices
@@ -279,7 +249,7 @@ serve(async (req: Request) => {
       try {
         // Calculate charges and build invoice items
         const invoiceItems: { description: string, amount: number, related_charge_id: string }[] = [];
-        let invoiceTotal = 0;
+        let totalAmount = 0;
 
         // Process each recurring charge
         for (const charge of charges) {
@@ -312,7 +282,7 @@ serve(async (req: Request) => {
             related_charge_id: charge.id
           });
           
-          invoiceTotal += itemAmount;
+          totalAmount += itemAmount;
         }
 
         // Generate unique invoice number (society_id + resident_id + timestamp)
@@ -328,7 +298,7 @@ serve(async (req: Request) => {
           continue;
         }
 
-        // Insert invoice with the batch ID
+        // Insert invoice
         const { data: invoice, error: invoiceError } = await supabase
           .from('invoices')
           .insert({
@@ -340,10 +310,9 @@ serve(async (req: Request) => {
             billing_period_end: billing_period_end,
             generation_date: formattedGenerationDate,
             due_date: formattedDueDate,
-            total_amount: invoiceTotal,
+            total_amount: totalAmount,
             generated_by_profile_id: profile.id,
-            status: 'draft',
-            invoice_batch_id: new_batch_id  // Link to the batch
+            status: 'pending'
           })
           .select('id')
           .single();
@@ -375,7 +344,6 @@ serve(async (req: Request) => {
         }
 
         createdInvoiceCount++;
-        totalAmount += invoiceTotal;
 
       } catch (error) {
         console.error(`Error processing resident ${resident.id}:`, error);
@@ -386,25 +354,10 @@ serve(async (req: Request) => {
       }
     }
 
-    // Update the invoice batch with actual counts and total amount
-    const { error: updateBatchError } = await supabase
-      .from('invoice_batches')
-      .update({
-        total_invoice_count: createdInvoiceCount,
-        total_amount: totalAmount
-      })
-      .eq('id', new_batch_id);
-
-    if (updateBatchError) {
-      console.error("Error updating invoice batch summary:", updateBatchError);
-      // Continue anyway, this is not critical
-    }
-
     return new Response(
       JSON.stringify({ 
         success: true,
-        message: 'Draft invoice batch created',
-        batch_id: new_batch_id,
+        message: `Invoice generation completed`,
         summary: {
           society_id,
           billing_period: {
@@ -412,7 +365,6 @@ serve(async (req: Request) => {
             end: billing_period_end
           },
           invoices_created: createdInvoiceCount,
-          total_amount: totalAmount,
           failed_invoices: failedInvoices,
           generation_date: formattedGenerationDate,
           due_date: formattedDueDate
