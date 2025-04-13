@@ -17,7 +17,6 @@ import Society from "./pages/Society";
 import Residents from "./pages/Residents";
 import Expenses from "./pages/Expenses";
 import Billing from "./pages/Billing";
-import BatchDetails from "./pages/billing/BatchDetails";
 import Units from "./pages/Units";
 
 // Layout imports
@@ -66,7 +65,6 @@ const Root = () => (
             <Route path="/residents" element={<Residents />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/billing" element={<Billing />} />
-            <Route path="/billing/batches/:batchId" element={<BatchDetails />} />
             <Route path="/units" element={<Units />} />
             <Route path="/settings" element={<Settings />} />
           </Route>

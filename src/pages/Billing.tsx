@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, FileText, AlertCircle, CalendarIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import InvoiceList from "@/components/invoices/InvoiceList";
 import {
   Select,
   SelectContent,
@@ -14,14 +15,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import InvoiceBatchList from "@/components/billing/InvoiceBatchList";
 
 const Billing = () => {
   const { profile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
   // Get previous month as default
   const getPreviousMonth = () => {
@@ -33,7 +30,6 @@ const Billing = () => {
   const defaultDate = getPreviousMonth();
   const [selectedMonth, setSelectedMonth] = useState(defaultDate.getMonth().toString());
   const [selectedYear, setSelectedYear] = useState(defaultDate.getFullYear().toString());
-  const [batchInfo, setBatchInfo] = useState(null);
 
   // Generate array of years (current year +/- 2 years)
   const currentYear = new Date().getFullYear();
@@ -70,39 +66,6 @@ const Billing = () => {
     };
   };
 
-  // Fetch batch status when selected period changes
-  useEffect(() => {
-    const fetchBatchStatus = async () => {
-      if (!profile?.society_id) return;
-      
-      const billingPeriod = getBillingPeriodDates();
-      setIsLoading(true);
-      
-      try {
-        const { data, error } = await supabase
-          .from('invoice_batches')
-          .select('id, status')
-          .eq('society_id', profile.society_id)
-          .eq('billing_period_start', billingPeriod.start)
-          .maybeSingle();
-          
-        if (error) throw error;
-        setBatchInfo(data);
-      } catch (error) {
-        console.error("Error fetching batch status:", error);
-        toast({
-          title: "Error",
-          description: "Could not fetch batch information",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchBatchStatus();
-  }, [profile?.society_id, selectedMonth, selectedYear]);
-
   const handleGenerateInvoices = async () => {
     if (!profile || !profile.society_id) {
       toast({
@@ -132,23 +95,10 @@ const Billing = () => {
       // Show success toast
       toast({
         title: "Success",
-        description: data.message || "Draft invoice batch created successfully.",
+        description: data.message || "Invoices generation initiated successfully.",
       });
 
       console.log("Function response:", data);
-      
-      // Refresh batch status
-      const { data: updatedBatch, error: batchError } = await supabase
-        .from('invoice_batches')
-        .select('id, status')
-        .eq('society_id', profile.society_id)
-        .eq('billing_period_start', billingPeriod.start)
-        .maybeSingle();
-        
-      if (!batchError) {
-        setBatchInfo(updatedBatch);
-      }
-      
     } catch (error) {
       console.error("Error generating invoices:", error);
       
@@ -163,63 +113,7 @@ const Billing = () => {
     }
   };
 
-  // Render status badge based on batch status
-  const renderStatusBadge = (status) => {
-    switch (status) {
-      case 'Draft':
-        return <Badge variant="secondary">Draft</Badge>;
-      case 'Pending':
-        return <Badge variant="default">Pending</Badge>;
-      case 'Sent':
-        return <Badge>Sent</Badge>;
-      default:
-        return null;
-    }
-  };
-
-  // Render action button based on batch status
-  const renderActionButton = () => {
-    if (isLoading) {
-      return (
-        <Button disabled className="flex items-center gap-2 whitespace-nowrap">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>Checking status...</span>
-        </Button>
-      );
-    }
-    
-    const billingPeriod = getBillingPeriodDates();
-    
-    if (!batchInfo) {
-      return (
-        <Button 
-          onClick={handleGenerateInvoices} 
-          disabled={isGenerating || !profile?.society_id}
-          className="flex items-center gap-2 whitespace-nowrap"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Generating...</span>
-            </>
-          ) : (
-            <>
-              <FileText className="h-4 w-4" />
-              <span>Generate Draft Batch for {billingPeriod.label}</span>
-            </>
-          )}
-        </Button>
-      );
-    }
-    
-    // If batch exists, just show status badge for now
-    return (
-      <div className="flex items-center gap-2">
-        <span>Invoices {batchInfo.status} for {billingPeriod.label}</span>
-        {renderStatusBadge(batchInfo.status)}
-      </div>
-    );
-  };
+  const billingPeriod = getBillingPeriodDates();
 
   return (
     <div className="space-y-6">
@@ -258,7 +152,23 @@ const Billing = () => {
             </div>
           </div>
           
-          {renderActionButton()}
+          <Button 
+            onClick={handleGenerateInvoices} 
+            disabled={isGenerating || !profile?.society_id}
+            className="flex items-center gap-2 whitespace-nowrap"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <FileText className="h-4 w-4" />
+                <span>Generate Invoices for {billingPeriod.label}</span>
+              </>
+            )}
+          </Button>
         </div>
       </div>
       
@@ -271,35 +181,29 @@ const Billing = () => {
         </CardHeader>
         <CardContent>
           {!profile?.society_id ? (
-            <Alert variant="destructive">
+            <div className="flex items-center gap-2 p-4 bg-amber-50 border border-amber-200 rounded-md text-amber-700">
               <AlertCircle className="h-5 w-5" />
-              <AlertDescription>
-                Please configure your society details before generating invoices.
-              </AlertDescription>
-            </Alert>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-muted-foreground">
-                Use the controls above to select a billing period and generate invoice batches.
-                {batchInfo && (
-                  <> Current status for {getBillingPeriodDates().label}: {renderStatusBadge(batchInfo.status)}</>
-                )}
-              </p>
+              <span>Please configure your society details before generating invoices.</span>
             </div>
+          ) : (
+            <p className="text-muted-foreground">
+              Use the "Generate Invoices" button to create invoices for all active residents for the selected billing period. 
+              The default selection is set to the previous month.
+            </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Invoice Batches List Card */}
+      {/* Invoices List Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Invoice Batches</CardTitle>
+          <CardTitle>Recent Invoices</CardTitle>
           <CardDescription>
-            View and manage invoice batches for your society
+            View and manage generated invoices for your society
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <InvoiceBatchList />
+          <InvoiceList />
         </CardContent>
       </Card>
     </div>

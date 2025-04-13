@@ -1,233 +1,228 @@
 
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
-import { toast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Eye, Download, Loader2 } from "lucide-react";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
-interface Invoice {
+// Define TypeScript types for our invoice data
+type Invoice = {
   id: number;
   invoice_number: string;
-  resident_id: number;
-  unit_id: number;
-  status: string;
-  generation_date: string;
+  billing_period_start: string;
   due_date: string;
   total_amount: number;
   amount_paid: number;
   balance_due: number;
-  resident_name?: string;
-  unit_number?: string;
-}
+  status: string;
+  resident_name: string | null;
+  unit_number: string | null;
+  block_name: string | null;
+};
 
-interface InvoiceListProps {
-  filterBatchId?: number;
-}
+// Helper function to format currency
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(amount);
+};
 
-const InvoiceList = ({ filterBatchId }: InvoiceListProps) => {
+// Helper function to determine badge variant based on invoice status
+const getStatusBadgeVariant = (status: string) => {
+  switch (status) {
+    case "paid":
+      return "default";
+    case "pending":
+      return "secondary";
+    case "overdue":
+      return "destructive";
+    case "partially_paid":
+      return "outline";
+    default:
+      return "secondary";
+  }
+};
+
+const InvoiceList = () => {
   const { profile } = useAuth();
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const societyId = profile?.society_id;
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-    }).format(amount);
-  };
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd MMM yyyy");
-  };
-
-  // Get status badge
-  const getStatusBadge = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "draft":
-        return <Badge variant="outline">Draft</Badge>;
-      case "pending":
-        return <Badge>Pending</Badge>;
-      case "paid":
-        return <Badge variant="secondary">Paid</Badge>;
-      case "overdue":
-        return <Badge variant="destructive">Overdue</Badge>;
-      case "cancelled":
-        return <Badge variant="secondary">Cancelled</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
-    }
-  };
-
-  // Fetch invoices with joined resident and unit data
+  // Fetch invoices with related data
   const fetchInvoices = async () => {
-    if (!profile?.society_id) return;
-    
-    setIsLoading(true);
-    setError(null);
+    if (!societyId) throw new Error("Society ID not available");
 
-    try {
-      let query = supabase
-        .from("invoices")
-        .select(`
-          *,
-          residents (name),
-          units (unit_number)
-        `)
-        .eq("society_id", profile.society_id);
-      
-      // Apply batch filter if provided
-      if (filterBatchId) {
-        query = query.eq("invoice_batch_id", filterBatchId);
-      }
+    const { data, error } = await supabase
+      .from("invoices")
+      .select(`
+        id,
+        invoice_number,
+        billing_period_start,
+        due_date,
+        total_amount,
+        amount_paid,
+        balance_due,
+        status,
+        residents!left (
+          name
+        ),
+        units!left (
+          unit_number,
+          society_blocks!left (
+            block_name
+          )
+        )
+      `)
+      .eq("society_id", societyId)
+      .order("due_date", { ascending: false });
 
-      const { data, error } = await query.order("created_at", { ascending: false });
+    if (error) throw error;
 
-      if (error) throw error;
-
-      // Process the joined data
-      const processedInvoices = data.map(invoice => ({
-        ...invoice,
-        resident_name: invoice.residents?.name,
-        unit_number: invoice.units?.unit_number,
-      }));
-
-      setInvoices(processedInvoices);
-    } catch (err: any) {
-      console.error("Error fetching invoices:", err);
-      setError("Failed to load invoices");
-      toast({
-        title: "Error",
-        description: "Could not load invoices. " + err.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    // Transform the nested data to a flat structure
+    return data.map((invoice) => ({
+      id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      billing_period_start: invoice.billing_period_start,
+      due_date: invoice.due_date,
+      total_amount: invoice.total_amount,
+      amount_paid: invoice.amount_paid,
+      balance_due: invoice.balance_due,
+      status: invoice.status,
+      resident_name: invoice.residents?.name || null,
+      unit_number: invoice.units?.unit_number || null,
+      block_name: invoice.units?.society_blocks?.block_name || null,
+    }));
   };
 
-  // Handle view invoice
-  const handleViewInvoice = (id: number) => {
-    toast({
-      title: "Coming Soon",
-      description: "Invoice viewing will be implemented soon.",
-    });
-  };
+  // Use React Query to manage data fetching
+  const {
+    data: invoices,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["invoices", societyId],
+    queryFn: fetchInvoices,
+    enabled: !!societyId,
+  });
 
-  // Handle download invoice
-  const handleDownloadInvoice = (id: number) => {
-    toast({
-      title: "Coming Soon",
-      description: "Invoice downloading will be implemented soon.",
-    });
-  };
-
-  // Subscribe to realtime updates and fetch initial data
+  // Set up Realtime subscription for invoices table
   useEffect(() => {
-    if (!profile?.society_id) return;
-    
-    fetchInvoices();
-    
-    // Set up subscription for realtime updates
+    if (!societyId) return;
+
+    // Subscribe to invoice changes for this society
     const channel = supabase
-      .channel("invoices-changes")
+      .channel("schema-db-changes")
       .on(
         "postgres_changes",
         {
-          event: "*",
-          schema: "public", 
+          event: "*", // Listen for all events (INSERT, UPDATE, DELETE)
+          schema: "public",
           table: "invoices",
-          filter: `society_id=eq.${profile.society_id}${filterBatchId ? ` AND invoice_batch_id=eq.${filterBatchId}` : ''}`,
+          filter: `society_id=eq.${societyId}`,
         },
-        (payload) => {
-          console.log("Realtime invoice update:", payload);
-          fetchInvoices(); // Re-fetch all invoices when there's an update
+        () => {
+          console.log("Received invoice change notification, refetching data");
+          refetch();
         }
       )
       .subscribe();
-      
-    // Cleanup subscription
+
+    // Cleanup subscription on unmount
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.society_id, filterBatchId]);
+  }, [societyId, refetch]);
 
-  if (isLoading && invoices.length === 0) {
+  // Handle loading state
+  if (isLoading) {
     return (
-      <div className="flex justify-center py-8">
+      <div className="flex justify-center items-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
-  if (error) {
+  // Handle error state
+  if (isError) {
     return (
-      <div className="text-center py-6">
-        <p className="text-destructive">{error}</p>
-        <Button variant="outline" className="mt-2" onClick={fetchInvoices}>
-          Try Again
-        </Button>
+      <Alert variant="destructive">
+        <AlertDescription>
+          {error instanceof Error ? error.message : "Failed to load invoices"}
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  // Handle empty state
+  if (!invoices || invoices.length === 0) {
+    return (
+      <div className="text-center p-8 text-muted-foreground">
+        No invoices found. Generate invoices using the button above.
       </div>
     );
   }
 
-  if (invoices.length === 0) {
-    return (
-      <div className="text-center py-6 text-muted-foreground">
-        <p>No invoices found.</p>
-      </div>
-    );
-  }
+  // Format unit display (Block - Unit #, or just Unit # if no block)
+  const formatUnitDisplay = (invoice: Invoice) => {
+    if (!invoice.unit_number) return "N/A";
+    if (invoice.block_name) {
+      return `${invoice.block_name} - ${invoice.unit_number}`;
+    }
+    return invoice.unit_number;
+  };
 
   return (
-    <div className="w-full overflow-auto">
+    <div className="rounded-md border">
       <Table>
-        <TableCaption>List of invoices</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead>Invoice #</TableHead>
-            <TableHead>Unit</TableHead>
             <TableHead>Resident</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Issue Date</TableHead>
+            <TableHead>Unit</TableHead>
+            <TableHead>Billing Period</TableHead>
             <TableHead>Due Date</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead>Total Amount</TableHead>
+            <TableHead>Amount Paid</TableHead>
+            <TableHead>Balance Due</TableHead>
+            <TableHead>Status</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {invoices.map((invoice) => (
             <TableRow key={invoice.id}>
               <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-              <TableCell>{invoice.unit_number}</TableCell>
-              <TableCell>{invoice.resident_name}</TableCell>
-              <TableCell>{getStatusBadge(invoice.status)}</TableCell>
-              <TableCell>{formatDate(invoice.generation_date)}</TableCell>
-              <TableCell>{formatDate(invoice.due_date)}</TableCell>
-              <TableCell className="text-right">{formatCurrency(invoice.total_amount)}</TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" size="icon" onClick={() => handleViewInvoice(invoice.id)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="icon" onClick={() => handleDownloadInvoice(invoice.id)}>
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </div>
+              <TableCell>{invoice.resident_name || "N/A"}</TableCell>
+              <TableCell>{formatUnitDisplay(invoice)}</TableCell>
+              <TableCell>
+                {invoice.billing_period_start
+                  ? format(new Date(invoice.billing_period_start), "MMMM yyyy")
+                  : "N/A"}
+              </TableCell>
+              <TableCell>
+                {invoice.due_date
+                  ? format(new Date(invoice.due_date), "MMM d, yyyy")
+                  : "N/A"}
+              </TableCell>
+              <TableCell>{formatCurrency(invoice.total_amount)}</TableCell>
+              <TableCell>{formatCurrency(invoice.amount_paid)}</TableCell>
+              <TableCell>{formatCurrency(invoice.balance_due)}</TableCell>
+              <TableCell>
+                <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                  {invoice.status.replace("_", " ")}
+                </Badge>
               </TableCell>
             </TableRow>
           ))}
