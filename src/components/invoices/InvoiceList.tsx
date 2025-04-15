@@ -90,7 +90,7 @@ const InvoiceList = () => {
     if (error) throw error;
 
     // Transform the nested data to a flat structure
-    return data.map((invoice) => ({
+    return data.map((invoice): Invoice => ({ // Added : Invoice type assertion here
       id: invoice.id,
       invoice_number: invoice.invoice_number,
       billing_period_start: invoice.billing_period_start,
