@@ -1,8 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Eye } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -26,7 +26,6 @@ type InvoiceBatch = {
   generated_at: string;
 };
 
-// Helper function to format currency
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -35,10 +34,10 @@ const formatCurrency = (amount: number) => {
 };
 
 const InvoiceBatchList = () => {
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const societyId = profile?.society_id;
 
-  // Fetch invoice batches
   const fetchInvoiceBatches = async () => {
     if (!societyId) throw new Error("Society ID not available");
 
@@ -52,7 +51,6 @@ const InvoiceBatchList = () => {
     return data as InvoiceBatch[];
   };
 
-  // Use React Query to manage data fetching
   const {
     data: batches,
     isLoading,
@@ -65,7 +63,6 @@ const InvoiceBatchList = () => {
     enabled: !!societyId,
   });
 
-  // Set up Realtime subscription for invoice_batches table
   useEffect(() => {
     if (!societyId) return;
 
@@ -91,7 +88,6 @@ const InvoiceBatchList = () => {
     };
   }, [societyId, refetch]);
 
-  // Handle loading state
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -100,7 +96,6 @@ const InvoiceBatchList = () => {
     );
   }
 
-  // Handle error state
   if (isError) {
     return (
       <Alert variant="destructive">
@@ -111,7 +106,6 @@ const InvoiceBatchList = () => {
     );
   }
 
-  // Handle empty state
   if (!batches || batches.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
@@ -152,6 +146,7 @@ const InvoiceBatchList = () => {
                   variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0"
+                  onClick={() => navigate(`/billing/batches/${batch.id}`)}
                 >
                   <Eye className="h-4 w-4" />
                   <span className="sr-only">View batch details</span>

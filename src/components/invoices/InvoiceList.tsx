@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -16,7 +15,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Define TypeScript types for our invoice data
 type Invoice = {
   id: number;
   invoice_number: string;
@@ -31,7 +29,6 @@ type Invoice = {
   block_name: string | null;
 };
 
-// Helper function to format currency
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -39,7 +36,6 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-// Helper function to determine badge variant based on invoice status
 const getStatusBadgeVariant = (status: string) => {
   switch (status) {
     case "paid":
@@ -55,15 +51,18 @@ const getStatusBadgeVariant = (status: string) => {
   }
 };
 
-const InvoiceList = () => {
+type InvoiceListProps = {
+  filterBatchId?: number;
+};
+
+const InvoiceList = ({ filterBatchId }: InvoiceListProps) => {
   const { profile } = useAuth();
   const societyId = profile?.society_id;
 
-  // Fetch invoices with related data
   const fetchInvoices = async () => {
     if (!societyId) throw new Error("Society ID not available");
 
-    const { data, error } = await supabase
+    let query = supabase
       .from("invoices")
       .select(`
         id,
@@ -87,10 +86,14 @@ const InvoiceList = () => {
       .eq("society_id", societyId)
       .order("due_date", { ascending: false });
 
+    if (filterBatchId) {
+      query = query.eq("invoice_batch_id", filterBatchId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
-    // Transform the nested data to a flat structure
-    return data.map((invoice): Invoice => ({ // Added : Invoice type assertion here
+    return data.map((invoice): Invoice => ({
       id: invoice.id,
       invoice_number: invoice.invoice_number,
       billing_period_start: invoice.billing_period_start,
@@ -105,7 +108,6 @@ const InvoiceList = () => {
     }));
   };
 
-  // Use React Query to manage data fetching
   const {
     data: invoices,
     isLoading,
@@ -113,22 +115,20 @@ const InvoiceList = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ["invoices", societyId],
+    queryKey: ["invoices", societyId, filterBatchId],
     queryFn: fetchInvoices,
     enabled: !!societyId,
   });
 
-  // Set up Realtime subscription for invoices table
   useEffect(() => {
     if (!societyId) return;
 
-    // Subscribe to invoice changes for this society
     const channel = supabase
       .channel("schema-db-changes")
       .on(
         "postgres_changes",
         {
-          event: "*", // Listen for all events (INSERT, UPDATE, DELETE)
+          event: "*",
           schema: "public",
           table: "invoices",
           filter: `society_id=eq.${societyId}`,
@@ -140,13 +140,11 @@ const InvoiceList = () => {
       )
       .subscribe();
 
-    // Cleanup subscription on unmount
     return () => {
       supabase.removeChannel(channel);
     };
   }, [societyId, refetch]);
 
-  // Handle loading state
   if (isLoading) {
     return (
       <div className="flex justify-center items-center p-8">
@@ -155,7 +153,6 @@ const InvoiceList = () => {
     );
   }
 
-  // Handle error state
   if (isError) {
     return (
       <Alert variant="destructive">
@@ -166,7 +163,6 @@ const InvoiceList = () => {
     );
   }
 
-  // Handle empty state
   if (!invoices || invoices.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
@@ -175,7 +171,6 @@ const InvoiceList = () => {
     );
   }
 
-  // Format unit display (Block - Unit #, or just Unit # if no block)
   const formatUnitDisplay = (invoice: Invoice) => {
     if (!invoice.unit_number) return "N/A";
     if (invoice.block_name) {
