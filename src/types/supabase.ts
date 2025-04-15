@@ -734,3 +734,9 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+export interface CancelBatchResponse {
+  success: boolean;
+  message: string;
+  deleted_invoices?: number;
+}
