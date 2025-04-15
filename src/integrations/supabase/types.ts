@@ -69,69 +69,6 @@ export type Database = {
           },
         ]
       }
-      invoice_batches: {
-        Row: {
-          billing_period_end: string
-          billing_period_start: string
-          created_at: string
-          finalized_at: string | null
-          generated_at: string
-          generated_by_profile_id: string
-          id: number
-          sent_at: string | null
-          society_id: number
-          status: string
-          total_amount: number | null
-          total_invoice_count: number | null
-          updated_at: string
-        }
-        Insert: {
-          billing_period_end: string
-          billing_period_start: string
-          created_at?: string
-          finalized_at?: string | null
-          generated_at?: string
-          generated_by_profile_id: string
-          id?: number
-          sent_at?: string | null
-          society_id: number
-          status?: string
-          total_amount?: number | null
-          total_invoice_count?: number | null
-          updated_at?: string
-        }
-        Update: {
-          billing_period_end?: string
-          billing_period_start?: string
-          created_at?: string
-          finalized_at?: string | null
-          generated_at?: string
-          generated_by_profile_id?: string
-          id?: number
-          sent_at?: string | null
-          society_id?: number
-          status?: string
-          total_amount?: number | null
-          total_invoice_count?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_batches_generated_by_profile_id_fkey"
-            columns: ["generated_by_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_batches_society_id_fkey"
-            columns: ["society_id"]
-            isOneToOne: false
-            referencedRelation: "societies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invoice_items: {
         Row: {
           amount: number
@@ -188,7 +125,6 @@ export type Database = {
           generated_by_profile_id: string
           generation_date: string | null
           id: number
-          invoice_batch_id: number | null
           invoice_number: string
           invoice_pdf_url: string | null
           resident_id: number
@@ -211,7 +147,6 @@ export type Database = {
           generated_by_profile_id: string
           generation_date?: string | null
           id?: number
-          invoice_batch_id?: number | null
           invoice_number: string
           invoice_pdf_url?: string | null
           resident_id: number
@@ -234,7 +169,6 @@ export type Database = {
           generated_by_profile_id?: string
           generation_date?: string | null
           id?: number
-          invoice_batch_id?: number | null
           invoice_number?: string
           invoice_pdf_url?: string | null
           resident_id?: number
@@ -257,13 +191,6 @@ export type Database = {
             columns: ["generated_by_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoices_invoice_batch_id_fkey"
-            columns: ["invoice_batch_id"]
-            isOneToOne: false
-            referencedRelation: "invoice_batches"
             referencedColumns: ["id"]
           },
           {
@@ -570,10 +497,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cancel_batch: {
-        Args: { p_batch_id: number }
-        Returns: Json
-      }
       create_expense: {
         Args: {
           p_society_id: number
@@ -598,10 +521,6 @@ export type Database = {
           p_is_active?: boolean
           p_whatsapp_opt_in?: boolean
         }
-        Returns: Json
-      }
-      finalize_batch: {
-        Args: { p_batch_id: number }
         Returns: Json
       }
       get_current_user_profile_id: {

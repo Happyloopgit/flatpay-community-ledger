@@ -1,5 +1,4 @@
 
-// Fix for the infinite type instantiation error
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +16,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
-// Define base types without recursive references
+// Define TypeScript types for our invoice data
 type Invoice = {
   id: number;
   invoice_number: string;
