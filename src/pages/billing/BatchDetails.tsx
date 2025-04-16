@@ -82,7 +82,7 @@ const BatchDetails = () => {
     setIsProcessing(true);
 
     try {
-      const { error, data } = await supabase.rpc("finalize_batch" as any, {
+      const { error, data } = await supabase.rpc("finalize_batch", {
         p_batch_id: numericBatchId,
       });
 
@@ -99,6 +99,42 @@ const BatchDetails = () => {
         title: "Success",
         description: `${result?.updated_invoices || 0} invoices finalized.`,
       });
+
+      const { data: invoices, error: invoicesError } = await supabase
+        .from("invoices")
+        .select("id")
+        .eq("invoice_batch_id", numericBatchId);
+
+      if (invoicesError) throw invoicesError;
+
+      if (invoices && invoices.length > 0) {
+        toast({
+          title: "PDF Generation",
+          description: `Starting PDF generation for ${invoices.length} invoices...`,
+        });
+
+        try {
+          await Promise.all(
+            invoices.map((invoice) =>
+              supabase.functions.invoke("generate-invoice-pdf", {
+                body: { invoice_id: invoice.id },
+              })
+            )
+          );
+
+          toast({
+            title: "PDF Generation Initiated",
+            description: `PDF generation started for ${invoices.length} invoices. They will be available shortly.`,
+          });
+        } catch (pdfError) {
+          console.error("Error during PDF generation:", pdfError);
+          toast({
+            title: "PDF Generation Error",
+            description: "Some PDFs may have failed to generate. Please check the invoices individually.",
+            variant: "destructive",
+          });
+        }
+      }
 
       await fetchBatchData();
       setShowFinalizeDialog(false);
