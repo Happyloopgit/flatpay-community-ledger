@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.29.0";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -173,6 +172,10 @@ serve(async (req: Request) => {
       );
     }
 
+    // After fetching society details
+    console.log(`Generating invoices for Society ID: ${society_id}`);
+    console.log(`Billing Period: ${billing_period_start} to ${billing_period_end}`);
+
     // Fetch active recurring charges
     const { data: charges, error: chargesError } = await supabase
       .from('recurring_charges')
@@ -189,6 +192,16 @@ serve(async (req: Request) => {
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // After fetching active recurring charges
+    if (charges && charges.length > 0) {
+      console.log(`Found ${charges.length} active recurring charges for the society`);
+      charges.forEach(charge => {
+        console.log(`Charge Details: ${charge.charge_name}, Type: ${charge.calculation_type}, Amount/Rate: ${charge.amount_or_rate}`);
+      });
+    } else {
+      console.log('No active recurring charges found for this society.');
     }
 
     // Fetch active residents with their associated units
@@ -231,6 +244,9 @@ serve(async (req: Request) => {
       }
     })) || [];
 
+    // After fetching residents
+    console.log(`Found ${formattedResidents.length} active residents with assigned units.`);
+
     // Calculate generation date and due date
     const generationDate = new Date();
     const dueDate = new Date(generationDate);
@@ -246,57 +262,67 @@ serve(async (req: Request) => {
 
     // Loop through residents and create invoices
     for (const resident of formattedResidents) {
-      try {
-        // Calculate charges and build invoice items
-        const invoiceItems: { description: string, amount: number, related_charge_id: string }[] = [];
-        let totalAmount = 0;
+      console.log(`Processing resident ID: ${resident.id}, Unit ID: ${resident.unit.id}, Unit Number: ${resident.unit.unit_number}`);
 
-        // Process each recurring charge
-        for (const charge of charges) {
-          let itemAmount = 0;
+      // Calculate charges and build invoice items
+      const invoiceItems: { description: string, amount: number, related_charge_id: string }[] = [];
+      let totalAmount = 0;
 
-          switch (charge.calculation_type) {
-            case 'fixed_per_unit':
-              itemAmount = charge.amount_or_rate;
-              break;
-            
-            case 'per_sqft':
-              if (resident.unit.size_sqft) {
-                itemAmount = charge.amount_or_rate * resident.unit.size_sqft;
-              } else {
-                console.warn(`Unit ${resident.unit.id} has no size_sqft. Skipping per_sqft charge.`);
-                continue; // Skip this charge
-              }
-              break;
-              
-            default:
-              console.warn(`Unsupported charge calculation_type: ${charge.calculation_type}`);
-              continue; // Skip this charge
-          }
+      // Process each recurring charge
+      for (const charge of charges) {
+        let itemAmount = 0;
 
-          // Add formatted item to the list
-          const monthYear = new Date(billing_period_start).toLocaleString('en-US', { month: 'short', year: 'numeric' });
-          invoiceItems.push({
-            description: `${charge.charge_name} - ${monthYear}`,
-            amount: itemAmount,
-            related_charge_id: charge.id
-          });
+        console.log(`Evaluating charge: ${charge.charge_name} (${charge.calculation_type})`);
+
+        switch (charge.calculation_type) {
+          case 'fixed_per_unit':
+            itemAmount = charge.amount_or_rate;
+            console.log(` Applying fixed per unit charge: ${itemAmount}`);
+            break;
           
-          totalAmount += itemAmount;
+          case 'per_sqft':
+            if (resident.unit.size_sqft) {
+              itemAmount = charge.amount_or_rate * resident.unit.size_sqft;
+              console.log(` Applying per sqft charge: Rate ${charge.amount_or_rate} * Size ${resident.unit.size_sqft} = ${itemAmount}`);
+            } else {
+              console.warn(`Unit ${resident.unit.id} has no size_sqft. Skipping per_sqft charge for ${charge.charge_name}.`);
+              continue;
+            }
+            break;
+            
+          default:
+            console.warn(`Unsupported charge calculation_type: ${charge.calculation_type}. Skipping.`);
+            continue;
         }
 
-        // Generate unique invoice number (society_id + resident_id + timestamp)
+        // Add formatted item to the list
+        const monthYear = new Date(billing_period_start).toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        invoiceItems.push({
+          description: `${charge.charge_name} - ${monthYear}`,
+          amount: itemAmount,
+          related_charge_id: charge.id
+        });
+        
+        totalAmount += itemAmount;
+      }
+
+      // Log invoice details before insertion
+      console.log(` Invoice for resident ${resident.id}: Total Amount = ${totalAmount}, Items = ${invoiceItems.length}`);
+
+      // Skip if no charges apply (empty invoice)
+      if (invoiceItems.length === 0) {
+        console.log(` Skipping invoice for resident ${resident.id} - no applicable charges`);
+        failedInvoices.push({
+          residentId: resident.id, 
+          reason: "No applicable charges"
+        });
+        continue;
+      }
+
+      try {
+        // Generate unique invoice number
         const timestamp = Date.now();
         const invoiceNumber = `INV-${society_id}-${resident.id}-${timestamp}`;
-
-        // Skip if no charges apply (empty invoice)
-        if (invoiceItems.length === 0) {
-          failedInvoices.push({
-            residentId: resident.id, 
-            reason: "No applicable charges"
-          });
-          continue;
-        }
 
         // Insert invoice
         const { data: invoice, error: invoiceError } = await supabase
@@ -312,7 +338,7 @@ serve(async (req: Request) => {
             due_date: formattedDueDate,
             total_amount: totalAmount,
             generated_by_profile_id: profile.id,
-            status: 'pending'
+            status: 'draft'
           })
           .select('id')
           .single();
@@ -325,6 +351,8 @@ serve(async (req: Request) => {
           });
           continue;
         }
+
+        console.log(` Successfully inserted invoice ID: ${invoice.id} for resident ${resident.id}`);
 
         // Insert invoice items
         for (const item of invoiceItems) {
@@ -339,7 +367,6 @@ serve(async (req: Request) => {
 
           if (itemError) {
             console.error(`Error creating invoice item for invoice ${invoice.id}:`, itemError);
-            // Continue with other items, the invoice has been created
           }
         }
 
