@@ -1,4 +1,5 @@
 
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -7,15 +8,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { toast } from "@/hooks/use-toast";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import { supabase } from "@/lib/supabase";
 
 const BatchDetails = () => {
   const navigate = useNavigate();
   const { batchId } = useParams();
+  const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const numericBatchId = parseInt(batchId || "0", 10);
 
-  const { data: batch, isLoading, error } = useQuery({
+  const { data: batch, isLoading, error, refetch: fetchBatchData } = useQuery({
     queryKey: ["invoice-batch", numericBatchId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -29,6 +43,46 @@ const BatchDetails = () => {
     },
     enabled: !!numericBatchId,
   });
+
+  const handleFinalizeBatch = async () => {
+    if (!batchId) return;
+
+    const numericBatchId = parseInt(batchId, 10);
+    if (isNaN(numericBatchId)) {
+      toast({
+        title: "Error",
+        description: "Invalid batch ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error, data } = await supabase.rpc("finalize_batch", {
+        p_batch_id: numericBatchId,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `${data?.updated_invoices || 0} invoices finalized.`,
+      });
+
+      await fetchBatchData();
+      setShowFinalizeDialog(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to finalize batch: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -76,11 +130,14 @@ const BatchDetails = () => {
           Back to Batches
         </Button>
 
-        {/* Status-based action buttons */}
         <div className="flex gap-2">
           {batch.status === "Draft" && (
             <>
-              <Button variant="default" className="gap-2">
+              <Button 
+                variant="default" 
+                className="gap-2" 
+                onClick={() => setShowFinalizeDialog(true)}
+              >
                 <Check className="h-4 w-4" />
                 Finalize Batch
               </Button>
@@ -149,6 +206,23 @@ const BatchDetails = () => {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={showFinalizeDialog} onOpenChange={setShowFinalizeDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Finalize Invoice Batch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to finalize this invoice batch? Invoices will be marked as Pending.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFinalizeBatch} disabled={isProcessing}>
+              {isProcessing ? "Finalizing..." : "Finalize"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
