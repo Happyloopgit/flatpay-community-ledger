@@ -570,6 +570,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_batch: {
+        Args: { p_batch_id: number }
+        Returns: Json
+      }
       create_expense: {
         Args: {
           p_society_id: number
@@ -594,6 +598,10 @@ export type Database = {
           p_is_active?: boolean
           p_whatsapp_opt_in?: boolean
         }
+        Returns: Json
+      }
+      finalize_batch: {
+        Args: { p_batch_id: number }
         Returns: Json
       }
       get_current_user_profile_id: {
