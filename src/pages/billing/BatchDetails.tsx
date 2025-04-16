@@ -37,10 +37,17 @@ interface FinalizeBatchResult {
   updated_invoices: number;
 }
 
+interface CancelBatchResult {
+  success: boolean;
+  message: string;
+  deleted_invoices: number;
+}
+
 const BatchDetails = () => {
   const navigate = useNavigate();
   const { batchId } = useParams();
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const numericBatchId = parseInt(batchId || "0", 10);
 
@@ -106,6 +113,53 @@ const BatchDetails = () => {
     }
   };
 
+  const handleCancelBatch = async () => {
+    if (!batchId) return;
+
+    const numericBatchId = parseInt(batchId, 10);
+    if (isNaN(numericBatchId)) {
+      toast({
+        title: "Error",
+        description: "Invalid batch ID.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const { error, data } = await supabase.rpc("cancel_batch", {
+        p_batch_id: numericBatchId,
+      });
+
+      if (error) throw error;
+
+      if (!data || Array.isArray(data)) {
+        console.error("Unexpected response format from cancel_batch:", data);
+        throw new Error("Received unexpected response from server after cancelling.");
+      }
+
+      const result = data as unknown as CancelBatchResult;
+
+      toast({
+        title: "Success",
+        description: `Draft batch cancelled. ${result?.deleted_invoices || 0} invoices deleted.`,
+      });
+
+      navigate("/billing");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to cancel batch: ${error.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+      setShowCancelDialog(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -159,11 +213,17 @@ const BatchDetails = () => {
                 variant="default" 
                 className="gap-2" 
                 onClick={() => setShowFinalizeDialog(true)}
+                disabled={isProcessing}
               >
                 <Check className="h-4 w-4" />
                 Finalize Batch
               </Button>
-              <Button variant="destructive" className="gap-2">
+              <Button 
+                variant="destructive" 
+                className="gap-2"
+                onClick={() => setShowCancelDialog(true)}
+                disabled={isProcessing}
+              >
                 <X className="h-4 w-4" />
                 Cancel Batch
               </Button>
@@ -241,6 +301,23 @@ const BatchDetails = () => {
             <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleFinalizeBatch} disabled={isProcessing}>
               {isProcessing ? "Finalizing..." : "Finalize"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Draft Batch?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this draft batch? All draft invoices within it will be permanently deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelBatch} disabled={isProcessing}>
+              {isProcessing ? "Cancelling..." : "Confirm"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
