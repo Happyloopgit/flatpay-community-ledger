@@ -17,7 +17,7 @@ import Residents from "./pages/Residents";
 import Expenses from "./pages/Expenses";
 import Billing from "./pages/Billing";
 import Units from "./pages/Units";
-import BatchDetails from "./pages/BatchDetails";
+import BatchDetails from "./pages/billing/BatchDetails"; // <-- CORRECTED PATH
 
 // Layout imports
 import MainLayout from "./components/layout/MainLayout";
