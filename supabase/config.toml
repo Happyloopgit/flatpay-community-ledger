@@ -26,3 +26,6 @@ port = 54327
 
 [functions.generate-invoices]
 verify_jwt = true
+
+[functions.generate-invoice-pdf]
+verify_jwt = true
