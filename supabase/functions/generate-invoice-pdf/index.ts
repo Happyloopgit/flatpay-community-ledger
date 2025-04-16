@@ -1,7 +1,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import * as puppeteer from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
+import { Document, Font, rgb } from "https://deno.land/x/denopdf/mod.ts";
 
 // Import shared CORS headers
 import { corsHeaders } from "../_shared/cors.ts";
@@ -17,6 +17,8 @@ interface InvoiceData {
   generation_date: string;
   due_date: string;
   total_amount: number;
+  amount_paid: number | null;
+  balance_due: number | null;
   status: string;
 }
 
@@ -216,39 +218,186 @@ serve(async (req: Request) => {
     };
     const societyData: SocietyData = society as SocietyData;
     
-    // Generate HTML for PDF
-    const htmlContent = generateInvoiceHTML(
-      invoiceData,
-      invoiceItemsData,
-      residentData,
-      unit,
-      societyData
-    );
-    
-    // Setup headless Chrome browser
-    console.log("Launching headless browser...");
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-    
-    const page = await browser.newPage();
-    await page.setContent(htmlContent);
-    
-    // Generate PDF
+    // Generate PDF using DenoPDF
     console.log("Generating PDF...");
-    const pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: {
-        top: "1cm",
-        right: "1cm",
-        bottom: "1cm",
-        left: "1cm",
-      },
-    });
     
-    await browser.close();
+    // Helper functions for data formatting
+    const formatDate = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-IN', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    };
+
+    const formatCurrency = (amount: number | null) => {
+      if (amount === null) return "₹0.00";
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2
+      }).format(amount).replace(/^(\D+)/, '₹');
+    };
+    
+    // Create a new PDF document
+    const pdf = new Document();
+    
+    // Add a page
+    const page = pdf.addPage();
+    
+    // Set font styles
+    page.setFont(Font.Helvetica);
+    
+    // PDF constants for layout positioning
+    const margin = 50;
+    const pageWidth = page.getWidth();
+    const pageHeight = page.getHeight();
+    const contentWidth = pageWidth - (margin * 2);
+    
+    // Colors
+    const primaryColor = rgb(0.145, 0.388, 0.922); // #2563eb
+    const textColor = rgb(0.2, 0.2, 0.2);
+    const lightGrayColor = rgb(0.9, 0.9, 0.9);
+    
+    // Header section
+    page.setFontSize(24);
+    page.setFontColor(primaryColor);
+    page.drawText("INVOICE", margin, pageHeight - 70);
+    
+    page.setFontSize(12);
+    page.setFontColor(textColor);
+    page.drawText(societyData.name || "", margin, pageHeight - 90);
+    if (societyData.address) {
+      page.drawText(societyData.address, margin, pageHeight - 110);
+    }
+    
+    // Invoice details (right aligned)
+    page.setFontSize(11);
+    page.setFontBold(true);
+    const invoiceNoText = "Invoice #: " + invoiceData.invoice_number;
+    const invoiceNoWidth = page.getTextWidth(invoiceNoText);
+    page.drawText(invoiceNoText, pageWidth - margin - invoiceNoWidth, pageHeight - 70);
+    
+    page.setFontBold(false);
+    const dateText = "Date: " + formatDate(invoiceData.generation_date || new Date().toISOString());
+    const dateWidth = page.getTextWidth(dateText);
+    page.drawText(dateText, pageWidth - margin - dateWidth, pageHeight - 90);
+    
+    const dueDateText = "Due Date: " + formatDate(invoiceData.due_date);
+    const dueDateWidth = page.getTextWidth(dueDateText);
+    page.drawText(dueDateText, pageWidth - margin - dueDateWidth, pageHeight - 110);
+    
+    // Billing details
+    let yPos = pageHeight - 160;
+    page.setFontBold(true);
+    page.drawText("Bill To:", margin, yPos);
+    page.setFontBold(false);
+    
+    yPos -= 20;
+    page.drawText(residentData.name, margin, yPos);
+    
+    yPos -= 20;
+    const unitText = "Unit: " + unit.unit_number + (unit.block_name ? ', Block: ' + unit.block_name : '');
+    page.drawText(unitText, margin, yPos);
+    
+    yPos -= 20;
+    page.drawText(residentData.phone_number, margin, yPos);
+    
+    if (residentData.email) {
+      yPos -= 20;
+      page.drawText(residentData.email, margin, yPos);
+    }
+    
+    // Billing period (right aligned)
+    page.setFontBold(true);
+    const billingPeriodLabel = "Billing Period:";
+    const billingLabelWidth = page.getTextWidth(billingPeriodLabel);
+    page.drawText(billingPeriodLabel, pageWidth - margin - billingLabelWidth, pageHeight - 160);
+    
+    page.setFontBold(false);
+    const periodText = `${formatDate(invoiceData.billing_period_start)} to ${formatDate(invoiceData.billing_period_end)}`;
+    const periodWidth = page.getTextWidth(periodText);
+    page.drawText(periodText, pageWidth - margin - periodWidth, pageHeight - 180);
+    
+    // Table header
+    yPos = pageHeight - 240;
+    
+    // Draw table header background
+    page.drawRectangle(margin, yPos - 10, contentWidth, 30, { fill: lightGrayColor });
+    
+    // Draw table headers
+    page.setFontBold(true);
+    page.drawText("Description", margin + 10, yPos);
+    
+    const amountText = "Amount";
+    const amountWidth = page.getTextWidth(amountText);
+    page.drawText(amountText, pageWidth - margin - amountWidth - 10, yPos);
+    
+    yPos -= 30;
+    page.setFontBold(false);
+    
+    // Draw table rows for invoice items
+    for (const item of invoiceItemsData) {
+      page.drawText(item.description, margin + 10, yPos);
+      
+      const itemAmountText = formatCurrency(item.amount);
+      const itemAmountWidth = page.getTextWidth(itemAmountText);
+      page.drawText(itemAmountText, pageWidth - margin - itemAmountWidth - 10, yPos);
+      
+      yPos -= 25;
+      
+      // Draw light separator line
+      page.setLineWidth(0.5);
+      page.setStrokeColor(lightGrayColor);
+      page.drawLine(margin, yPos + 10, margin + contentWidth, yPos + 10);
+    }
+    
+    // Total row
+    yPos -= 15;
+    page.setFontBold(true);
+    page.drawText("Total", pageWidth - margin - 100, yPos);
+    
+    const totalText = formatCurrency(invoiceData.total_amount);
+    const totalWidth = page.getTextWidth(totalText);
+    page.drawText(totalText, pageWidth - margin - totalWidth - 10, yPos);
+    
+    // Amount paid row (if applicable)
+    if (invoiceData.amount_paid !== null && invoiceData.amount_paid > 0) {
+      yPos -= 25;
+      page.drawText("Amount Paid", pageWidth - margin - 100, yPos);
+      
+      const paidText = formatCurrency(invoiceData.amount_paid);
+      const paidWidth = page.getTextWidth(paidText);
+      page.drawText(paidText, pageWidth - margin - paidWidth - 10, yPos);
+    }
+    
+    // Balance due row
+    yPos -= 25;
+    page.drawText("Balance Due", pageWidth - margin - 100, yPos);
+    
+    const balanceText = formatCurrency(invoiceData.balance_due || invoiceData.total_amount);
+    const balanceWidth = page.getTextWidth(balanceText);
+    page.drawText(balanceText, pageWidth - margin - balanceWidth - 10, yPos);
+    
+    // Payment instructions
+    yPos -= 60;
+    page.setFontBold(true);
+    page.drawText("Payment Instructions:", margin, yPos);
+    
+    yPos -= 20;
+    page.setFontBold(false);
+    page.drawText("Please make payment by the due date to avoid late fees.", margin, yPos);
+    
+    // Footer
+    page.setFontSize(10);
+    page.setFontColor(rgb(0.4, 0.4, 0.4));
+    const footerText = "This is a computer-generated invoice and does not require a signature.";
+    const footerWidth = page.getTextWidth(footerText);
+    page.drawText(footerText, (pageWidth - footerWidth) / 2, margin);
+    
+    // Get the PDF as a Uint8Array
+    const pdfBytes = await pdf.save();
     
     // Create storage bucket if it doesn't exist
     const bucketName = "invoices";
@@ -283,7 +432,7 @@ serve(async (req: Request) => {
     const { data: uploadData, error: uploadError } = await supabase
       .storage
       .from(bucketName)
-      .upload(filePath, pdfBuffer, {
+      .upload(filePath, pdfBytes, {
         contentType: "application/pdf",
         upsert: true,
       });
@@ -299,11 +448,11 @@ serve(async (req: Request) => {
       );
     }
     
-    // Get public or signed URL
+    // Get signed URL with 1 year expiry
     const { data: urlData } = await supabase
       .storage
       .from(bucketName)
-      .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 days expiry
+      .createSignedUrl(filePath, 60 * 60 * 24 * 365); // 1 year expiry
     
     const pdfUrl = urlData?.signedUrl;
     
@@ -347,168 +496,3 @@ serve(async (req: Request) => {
     );
   }
 });
-
-// Helper function to generate HTML content for the invoice
-function generateInvoiceHTML(
-  invoice: InvoiceData,
-  items: InvoiceItemData[],
-  resident: ResidentData,
-  unit: UnitData,
-  society: SocietyData
-): string {
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-IN', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2
-    }).format(amount);
-  };
-
-  // Create line items HTML
-  const itemsHTML = items.map((item) => `
-    <tr>
-      <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.description}</td>
-      <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">${formatCurrency(item.amount)}</td>
-    </tr>
-  `).join('');
-
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Invoice ${invoice.invoice_number}</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          font-size: 12px;
-          line-height: 1.5;
-          color: #333;
-        }
-        .invoice-container {
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .invoice-header {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 40px;
-        }
-        .invoice-title {
-          font-size: 24px;
-          font-weight: bold;
-          color: #2563eb;
-        }
-        .invoice-details {
-          margin-bottom: 30px;
-        }
-        .invoice-details-row {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 20px;
-        }
-        .invoice-details-column {
-          flex: 1;
-        }
-        .label {
-          font-weight: bold;
-          margin-bottom: 4px;
-        }
-        .value {
-          margin-bottom: 8px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 20px;
-        }
-        th {
-          background-color: #f3f4f6;
-          padding: 10px 8px;
-          text-align: left;
-          font-weight: bold;
-          border-bottom: 2px solid #ddd;
-        }
-        .total-row {
-          font-weight: bold;
-        }
-        .footer {
-          margin-top: 40px;
-          text-align: center;
-          font-size: 11px;
-          color: #6b7280;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="invoice-container">
-        <div class="invoice-header">
-          <div>
-            <div class="invoice-title">INVOICE</div>
-            <div style="color: #4b5563;">
-              <div style="margin-top: 10px;">${society.name}</div>
-              <div>${society.address || ''}</div>
-            </div>
-          </div>
-          <div style="text-align: right;">
-            <div style="font-weight: bold;">Invoice #: ${invoice.invoice_number}</div>
-            <div>Date: ${formatDate(invoice.generation_date || new Date().toISOString())}</div>
-            <div>Due Date: ${formatDate(invoice.due_date)}</div>
-          </div>
-        </div>
-
-        <div class="invoice-details">
-          <div class="invoice-details-row">
-            <div class="invoice-details-column">
-              <div class="label">Bill To:</div>
-              <div class="value">${resident.name}</div>
-              <div class="value">Unit: ${unit.unit_number}${unit.block_name ? ', Block: ' + unit.block_name : ''}</div>
-              <div class="value">${resident.phone_number}</div>
-              <div class="value">${resident.email || ''}</div>
-            </div>
-            <div class="invoice-details-column">
-              <div class="label">Billing Period:</div>
-              <div class="value">${formatDate(invoice.billing_period_start)} to ${formatDate(invoice.billing_period_end)}</div>
-            </div>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>Description</th>
-              <th style="text-align: right;">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${itemsHTML}
-            <tr class="total-row">
-              <td style="padding: 12px 8px; text-align: right; font-weight: bold;">Total</td>
-              <td style="padding: 12px 8px; text-align: right; font-weight: bold;">${formatCurrency(invoice.total_amount)}</td>
-            </tr>
-          </tbody>
-        </table>
-
-        <div style="margin-top: 40px;">
-          <div class="label">Payment Instructions:</div>
-          <div class="value">Please make payment by the due date to avoid late fees.</div>
-        </div>
-
-        <div class="footer">
-          <p>This is a computer-generated invoice and does not require a signature.</p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
