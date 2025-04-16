@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +20,22 @@ import {
 import { toast } from "@/hooks/use-toast";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import { supabase } from "@/lib/supabase";
+
+interface FinalizeBatchResult {
+  id: number;
+  society_id: number;
+  status: string;
+  billing_period_start: string;
+  billing_period_end: string;
+  generated_at: string;
+  finalized_at: string;
+  updated_at: string;
+  created_at: string;
+  generated_by_profile_id: string;
+  total_invoice_count: number;
+  total_amount: number;
+  updated_invoices: number;
+}
 
 const BatchDetails = () => {
   const navigate = useNavigate();
@@ -60,15 +75,22 @@ const BatchDetails = () => {
     setIsProcessing(true);
 
     try {
-      const { error, data } = await supabase.rpc("finalize_batch", {
+      const { error, data } = await supabase.rpc("finalize_batch" as any, {
         p_batch_id: numericBatchId,
       });
 
       if (error) throw error;
 
+      if (!data || Array.isArray(data)) {
+        console.error("Unexpected response format from finalize_batch:", data);
+        throw new Error("Received unexpected response from server after finalizing.");
+      }
+
+      const result = data as unknown as FinalizeBatchResult;
+
       toast({
         title: "Success",
-        description: `${data?.updated_invoices || 0} invoices finalized.`,
+        description: `${result?.updated_invoices || 0} invoices finalized.`,
       });
 
       await fetchBatchData();
