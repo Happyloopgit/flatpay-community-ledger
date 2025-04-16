@@ -1,7 +1,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { Document, rgb } from "https://cdn.jsdelivr.net/npm/pdfjs-dist/build/pdf.js";
+import PDFDocument from "https://deno.land/x/deno_pdfkit@0.2.0/mod.ts";
 
 // Import shared CORS headers
 import { corsHeaders } from "../_shared/cors.ts";
@@ -218,49 +218,230 @@ serve(async (req: Request) => {
     };
     const societyData: SocietyData = society as SocietyData;
     
-    console.log("Generating PDF...");
-    console.log("Invoice data:", JSON.stringify(invoiceData));
-    console.log("Invoice items:", JSON.stringify(invoiceItemsData));
+    console.log("Generating PDF for invoice:", invoiceData.invoice_number);
     
-    // Instead of generating a real PDF which is causing issues in Edge Functions,
-    // we'll create a mock PDF for demonstration
-    // This would be replaced with a real PDF generation solution in a production environment
+    // Create a new PDF document using deno-pdfkit
+    const doc = new PDFDocument({ margin: 50 });
     
-    // Generate a simple PDF using a different technique or text-based representation
-    // For now, we'll create a simple buffer with "PDF" text as a placeholder
-    const mockPdfText = `
-      INVOICE
-      
-      Society: ${societyData.name}
-      Invoice #: ${invoiceData.invoice_number}
-      Date: ${new Date(invoiceData.generation_date).toLocaleDateString()}
-      Due Date: ${new Date(invoiceData.due_date).toLocaleDateString()}
-      
-      Bill To:
-      ${residentData.name}
-      Unit: ${unit.unit_number}${unit.block_name ? ', Block: ' + unit.block_name : ''}
-      ${residentData.phone_number}
-      ${residentData.email || ''}
-      
-      Billing Period:
-      ${new Date(invoiceData.billing_period_start).toLocaleDateString()} to ${new Date(invoiceData.billing_period_end).toLocaleDateString()}
-      
-      Items:
-      ${invoiceItemsData.map(item => `${item.description}: ₹${item.amount.toFixed(2)}`).join('\n')}
-      
-      Total: ₹${invoiceData.total_amount.toFixed(2)}
-      ${invoiceData.amount_paid ? `Amount Paid: ₹${invoiceData.amount_paid.toFixed(2)}` : ''}
-      Balance Due: ₹${(invoiceData.balance_due || invoiceData.total_amount).toFixed(2)}
-      
-      Payment Instructions:
-      Please make payment by the due date to avoid late fees.
-      
-      This is a computer-generated invoice and does not require a signature.
-    `;
+    // Initialize a buffer to store the PDF data
+    const chunks: Uint8Array[] = [];
     
-    // Convert text to Uint8Array
-    const encoder = new TextEncoder();
-    const pdfBytes = encoder.encode(mockPdfText);
+    // Collect PDF data chunks
+    doc.on("data", (chunk: Uint8Array) => {
+      chunks.push(chunk);
+    });
+    
+    // Promise to handle PDF generation completion
+    const pdfPromise = new Promise<Uint8Array>((resolve) => {
+      doc.on("end", () => {
+        // Concatenate all chunks into a single Uint8Array
+        const pdfLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+        const pdfBytes = new Uint8Array(pdfLength);
+        
+        let offset = 0;
+        for (const chunk of chunks) {
+          pdfBytes.set(chunk, offset);
+          offset += chunk.length;
+        }
+        
+        resolve(pdfBytes);
+      });
+    });
+    
+    // Format dates for display
+    const formatDate = (dateStr: string) => {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      });
+    };
+    
+    // Define some reusable styles
+    const titleFontSize = 22;
+    const headingFontSize = 14;
+    const normalFontSize = 12;
+    const smallFontSize = 10;
+    
+    const lineHeight = 20;
+    const tableTop = 280;
+    
+    const colors = {
+      primary: '#333333',
+      secondary: '#777777',
+      accent: '#4F46E5',
+      border: '#DDDDDD'
+    };
+    
+    // Define table columns
+    const columns = [
+      { x: 50, w: 300 }, // Description column 
+      { x: 350, w: 100, align: 'right' } // Amount column
+    ];
+    
+    // Start writing the PDF content
+    
+    // Add society name and logo
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(titleFontSize)
+      .fillColor(colors.primary)
+      .text(societyData.name, 50, 50);
+    
+    if (societyData.address) {
+      doc
+        .font('Helvetica')
+        .fontSize(normalFontSize)
+        .fillColor(colors.secondary)
+        .text(societyData.address, 50, 75, { width: 250 });
+    }
+    
+    // Add invoice title and number
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(headingFontSize)
+      .fillColor(colors.accent)
+      .text('INVOICE', 400, 50)
+      .font('Helvetica')
+      .fontSize(normalFontSize)
+      .fillColor(colors.primary)
+      .text(`#${invoiceData.invoice_number}`, 400, 70)
+      .text(`Date: ${formatDate(invoiceData.generation_date)}`, 400, 90)
+      .text(`Due Date: ${formatDate(invoiceData.due_date)}`, 400, 110);
+    
+    // Add billing period
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(normalFontSize)
+      .text('Billing Period:', 50, 130)
+      .font('Helvetica')
+      .text(`${formatDate(invoiceData.billing_period_start)} to ${formatDate(invoiceData.billing_period_end)}`, 150, 130);
+    
+    // Add horizontal separator
+    doc
+      .strokeColor(colors.border)
+      .lineWidth(1)
+      .moveTo(50, 150)
+      .lineTo(550, 150)
+      .stroke();
+    
+    // Add resident information
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(normalFontSize)
+      .text('Bill To:', 50, 170);
+    
+    // Resident name and unit
+    doc
+      .font('Helvetica')
+      .fontSize(normalFontSize)
+      .text(residentData.name, 50, 190)
+      .text(`Unit: ${unit.unit_number}${unit.block_name ? ', Block: ' + unit.block_name : ''}`, 50, 210);
+    
+    // Contact information
+    if (residentData.phone_number) {
+      doc.text(`Phone: ${residentData.phone_number}`, 50, 230);
+    }
+    
+    if (residentData.email) {
+      doc.text(`Email: ${residentData.email}`, 50, 250);
+    }
+    
+    // Add table header
+    doc
+      .font('Helvetica-Bold')
+      .fillColor(colors.primary)
+      .lineWidth(1)
+      .strokeColor(colors.border)
+      .rect(50, tableTop, 500, 30)
+      .stroke();
+    
+    doc
+      .text('Description', columns[0].x + 10, tableTop + 10)
+      .text('Amount', columns[1].x, tableTop + 10, { width: columns[1].w, align: 'right' });
+    
+    // Add table rows for each invoice item
+    let y = tableTop + 30;
+    
+    for (const item of invoiceItemsData) {
+      // Draw row background
+      doc
+        .rect(50, y, 500, 25)
+        .stroke();
+      
+      // Add item data
+      doc
+        .font('Helvetica')
+        .fillColor(colors.primary)
+        .text(item.description, columns[0].x + 10, y + 7, { width: columns[0].w - 20 })
+        .text(`₹${item.amount.toFixed(2)}`, columns[1].x, y + 7, { width: columns[1].w, align: 'right' });
+      
+      y += 25;
+    }
+    
+    // Add totals section
+    y += 20;
+    
+    // Format for total section
+    const totalLineY = (lineText: string, amount: number | null, isBold = false) => {
+      if (isBold) {
+        doc.font('Helvetica-Bold');
+      } else {
+        doc.font('Helvetica');
+      }
+      
+      doc.text(
+        lineText,
+        350,
+        y,
+        { width: 100, align: 'left' }
+      );
+      
+      doc.text(
+        `₹${(amount || 0).toFixed(2)}`,
+        450,
+        y,
+        { width: 100, align: 'right' }
+      );
+      
+      y += 20;
+    };
+    
+    // Draw totals
+    totalLineY('Total:', invoiceData.total_amount);
+    
+    if (invoiceData.amount_paid && invoiceData.amount_paid > 0) {
+      totalLineY('Amount Paid:', invoiceData.amount_paid);
+    }
+    
+    totalLineY('Balance Due:', invoiceData.balance_due || invoiceData.total_amount, true);
+    
+    // Add payment instructions
+    y += 20;
+    
+    doc
+      .font('Helvetica-Bold')
+      .text('Payment Instructions:', 50, y);
+    
+    y += 20;
+    
+    doc
+      .font('Helvetica')
+      .text('Please make payment by the due date to avoid late fees.', 50, y);
+    
+    y += 30;
+    
+    doc
+      .fontSize(smallFontSize)
+      .fillColor(colors.secondary)
+      .text('This is a computer-generated invoice and does not require a signature.', 50, y);
+    
+    // Finalize the PDF
+    doc.end();
+    
+    // Wait for the PDF generation to complete
+    const pdfBytes = await pdfPromise;
     
     // Create storage bucket if it doesn't exist
     const bucketName = "invoices";
@@ -296,7 +477,7 @@ serve(async (req: Request) => {
       .storage
       .from(bucketName)
       .upload(filePath, pdfBytes, {
-        contentType: "text/plain", // Using plain text since we're not generating a real PDF
+        contentType: "application/pdf",
         upsert: true,
       });
     
