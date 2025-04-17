@@ -1,8 +1,6 @@
-
-// api/generate-pdf.js
-const PDFDocument = require('pdfkit');
-const { createClient } = require('@supabase/supabase-js');
-const { format } = require('date-fns');
+import PDFDocument from 'pdfkit';
+import { createClient } from '@supabase/supabase-js';
+import { format } from 'date-fns';
 
 // Get Supabase connection details from environment variables
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
