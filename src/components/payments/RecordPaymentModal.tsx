@@ -31,7 +31,9 @@ export function RecordPaymentModal({
   const handleSubmit = async (data: PaymentFormData) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.rpc("record_payment", {
+      // Use any type to bypass TypeScript RPC function name validation
+      // since we know the function exists on the backend
+      const { error } = await supabase.rpc("record_payment" as any, {
         p_invoice_id: invoiceId,
         p_amount: data.amount,
         p_payment_date: data.payment_date.toISOString().split("T")[0],

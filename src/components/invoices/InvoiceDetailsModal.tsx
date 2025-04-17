@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
@@ -64,46 +65,50 @@ export function InvoiceDetailsModal({
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  useEffect(() => {
-    async function fetchInvoiceDetails() {
-      if (!open || !invoiceId) return;
+  // Refactored: Move fetch logic to a standalone function
+  const loadInvoiceData = async () => {
+    if (!invoiceId) return;
+    
+    setIsLoading(true);
+    setError(null);
 
-      setIsLoading(true);
-      setError(null);
+    try {
+      const { data: invoice, error: invoiceError } = await supabase
+        .from("invoices")
+        .select(
+          `*, 
+           residents(name),
+           units(
+             unit_number,
+             society_blocks(block_name)
+           )`
+        )
+        .eq("id", invoiceId)
+        .single();
 
-      try {
-        const { data: invoice, error: invoiceError } = await supabase
-          .from("invoices")
-          .select(
-            `*, 
-             residents(name),
-             units(
-               unit_number,
-               society_blocks(block_name)
-             )`
-          )
-          .eq("id", invoiceId)
-          .single();
+      if (invoiceError) throw new Error(invoiceError.message);
 
-        if (invoiceError) throw new Error(invoiceError.message);
+      const { data: items, error: itemsError } = await supabase
+        .from("invoice_items")
+        .select("*")
+        .eq("invoice_id", invoiceId);
 
-        const { data: items, error: itemsError } = await supabase
-          .from("invoice_items")
-          .select("*")
-          .eq("invoice_id", invoiceId);
+      if (itemsError) throw new Error(itemsError.message);
 
-        if (itemsError) throw new Error(itemsError.message);
-
-        setInvoiceData(invoice);
-        setInvoiceItems(items);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
+      setInvoiceData(invoice);
+      setInvoiceItems(items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    fetchInvoiceDetails();
+  useEffect(() => {
+    // Call the refactored function when dependencies change
+    if (open && invoiceId) {
+      loadInvoiceData();
+    }
   }, [invoiceId, open]);
 
   const formatCurrency = (amount: number) => {
@@ -235,7 +240,7 @@ export function InvoiceDetailsModal({
                 balanceDue={invoiceData.balance_due}
                 open={showPaymentModal}
                 onOpenChange={setShowPaymentModal}
-                onPaymentRecorded={fetchInvoiceDetails}
+                onPaymentRecorded={loadInvoiceData}
               />
             )}
           </>
