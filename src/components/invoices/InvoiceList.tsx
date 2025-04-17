@@ -14,6 +14,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { getStatusBadgeVariant } from "@/lib/utils";
+import InvoiceDetailsModal from "./InvoiceDetailsModal";
 
 type Invoice = {
   id: number;
@@ -34,21 +36,6 @@ const formatCurrency = (amount: number) => {
     style: "currency",
     currency: "INR",
   }).format(amount);
-};
-
-const getStatusBadgeVariant = (status: string) => {
-  switch (status) {
-    case "paid":
-      return "default";
-    case "pending":
-      return "secondary";
-    case "overdue":
-      return "destructive";
-    case "partially_paid":
-      return "outline";
-    default:
-      return "secondary";
-  }
 };
 
 type InvoiceListProps = {
