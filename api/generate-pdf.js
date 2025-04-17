@@ -172,16 +172,21 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: `Failed to upload PDF: ${uploadError.message}` });
         }
         
-        // Get a public URL for the PDF
-        const { data: publicUrlData } = await adminSupabase.storage
+        // Get a signed URL for the PDF with 1 year expiration (31536000 seconds)
+        const { data: signedUrlData, error: signedUrlError } = await adminSupabase.storage
           .from('invoices')
-          .getPublicUrl(filePath);
+          .createSignedUrl(filePath, 31536000);
         
-        const pdfUrl = publicUrlData.publicUrl;
+        if (signedUrlError) {
+          console.error("Failed to create signed URL:", signedUrlError);
+          return res.status(500).json({ error: `Failed to create signed URL: ${signedUrlError.message}` });
+        }
         
-        console.log(`PDF uploaded successfully. URL: ${pdfUrl}`);
+        const pdfUrl = signedUrlData.signedUrl;
         
-        // Update invoice record with PDF URL
+        console.log(`PDF uploaded successfully. Signed URL created with 1-year expiration.`);
+        
+        // Update invoice record with PDF signed URL
         const { error: updateError } = await adminSupabase
           .from('invoices')
           .update({ invoice_pdf_url: pdfUrl })
@@ -192,7 +197,7 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: `Failed to update invoice record: ${updateError.message}` });
         }
         
-        console.log(`Invoice record updated with PDF URL`);
+        console.log(`Invoice record updated with signed PDF URL`);
         
         // Return success response
         return res.status(200).json({ 
