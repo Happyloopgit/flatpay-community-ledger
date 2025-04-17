@@ -36,7 +36,7 @@ export function RecordPaymentModal({
       const { error } = await supabase.rpc("record_payment" as any, {
         p_invoice_id: invoiceId,
         p_amount: data.amount,
-        p_payment_date: data.payment_date.toISOString().split("T")[0],
+        p_payment_date: data.payment_date.toISOString(),
         p_payment_method: data.payment_method,
         p_reference_number: data.reference_number || null,
         p_notes: data.notes || null,
