@@ -31,16 +31,29 @@ export function RecordPaymentModal({
   const handleSubmit = async (data: PaymentFormData) => {
     setIsSubmitting(true);
     try {
+      // --- START: Add Debug Logging ---
+      const argsForRPC = {
+          p_invoice_id: invoiceId, 
+          p_amount: data.amount,      
+          p_payment_date: data.payment_date.toISOString(), 
+          p_payment_method: data.payment_method,      
+          p_reference_number: data.reference_number || null, 
+          p_notes: data.notes || null                        
+      };
+      console.log("Arguments being sent to RPC:", argsForRPC);
+      console.log("Types:", { 
+          p_invoice_id: typeof invoiceId,
+          p_amount: typeof data.amount,
+          p_payment_date: typeof data.payment_date.toISOString(),
+          p_payment_method: typeof data.payment_method,
+          p_reference_number: typeof (data.reference_number || null),
+          p_notes: typeof (data.notes || null)
+      });
+      // --- END: Add Debug Logging ---
+
       // Use any type to bypass TypeScript RPC function name validation
       // since we know the function exists on the backend
-      const { error } = await supabase.rpc("record_payment" as any, {
-        p_invoice_id: invoiceId,
-        p_amount: data.amount,
-        p_payment_date: data.payment_date.toISOString(),
-        p_payment_method: data.payment_method,
-        p_reference_number: data.reference_number || null,
-        p_notes: data.notes || null,
-      });
+      const { error } = await supabase.rpc("record_payment" as any, argsForRPC ); // Pass the argsForRPC object
 
       if (error) throw error;
 
