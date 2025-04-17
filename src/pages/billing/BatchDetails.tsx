@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -20,6 +21,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import InvoiceList from "@/components/invoices/InvoiceList";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FinalizeBatchResult {
   id: number;
@@ -50,6 +52,7 @@ const BatchDetails = () => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const numericBatchId = parseInt(batchId || "0", 10);
+  const { session } = useAuth();
 
   const { data: batch, isLoading, error, refetch: fetchBatchData } = useQuery({
     queryKey: ["invoice-batch", numericBatchId],
@@ -113,26 +116,55 @@ const BatchDetails = () => {
           description: `Starting PDF generation for ${invoices.length} invoices...`,
         });
 
-        try {
-          await Promise.all(
-            invoices.map((invoice) =>
-              supabase.functions.invoke("generate-invoice-pdf", {
-                body: { invoice_id: invoice.id },
-              })
-            )
-          );
-
-          toast({
-            title: "PDF Generation Initiated",
-            description: `PDF generation started for ${invoices.length} invoices. They will be available shortly.`,
-          });
-        } catch (pdfError) {
-          console.error("Error during PDF generation:", pdfError);
+        // Get auth token from session
+        const token = session?.access_token;
+        if (!token) {
+          console.error("Authentication token not available");
           toast({
             title: "PDF Generation Error",
-            description: "Some PDFs may have failed to generate. Please check the invoices individually.",
+            description: "Authentication required for PDF generation. Please login again.",
             variant: "destructive",
           });
+        } else {
+          try {
+            await Promise.all(
+              invoices.map(async (invoice) => {
+                try {
+                  const response = await fetch('/api/generate-pdf', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ invoice_id: invoice.id })
+                  });
+
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `PDF generation failed for invoice ${invoice.id} with status ${response.status}`);
+                  }
+
+                  const result = await response.json();
+                  console.log(`PDF generation triggered for invoice ${invoice.id}:`, result);
+                } catch (fetchError) {
+                  console.error(`Error triggering PDF generation for invoice ${invoice.id}:`, fetchError);
+                  throw fetchError;
+                }
+              })
+            );
+
+            toast({
+              title: "PDF Generation Initiated",
+              description: `PDF generation started for ${invoices.length} invoices. They will be available shortly.`,
+            });
+          } catch (pdfError) {
+            console.error("Error during PDF generation:", pdfError);
+            toast({
+              title: "PDF Generation Error",
+              description: "Some PDFs may have failed to generate. Please check the invoices individually.",
+              variant: "destructive",
+            });
+          }
         }
       }
 
