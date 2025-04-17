@@ -1,3 +1,4 @@
+
 import PDFDocument from 'pdfkit';
 import { createClient } from '@supabase/supabase-js';
 import { format } from 'date-fns';
@@ -6,17 +7,6 @@ import { format } from 'date-fns';
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-// Validate required environment variables
-if (!supabaseUrl) {
-  console.error("Missing VITE_SUPABASE_URL environment variable");
-  return res.status(500).json({ error: 'Server configuration error: Missing Supabase URL' });
-}
-
-if (!supabaseAnonKey) {
-  console.error("Missing VITE_SUPABASE_ANON_KEY environment variable");
-  return res.status(500).json({ error: 'Server configuration error: Missing Supabase Anon Key' });
-}
 
 // Helper function to format currency
 const formatCurrency = (amount) => {
@@ -35,6 +25,17 @@ export default async function handler(req, res) {
 
   try {
     console.log("Received request to /api/generate-pdf");
+    
+    // Validate required environment variables
+    if (!supabaseUrl) {
+      console.error("Missing VITE_SUPABASE_URL environment variable");
+      return res.status(500).json({ error: 'Server configuration error: Missing Supabase URL' });
+    }
+
+    if (!supabaseAnonKey) {
+      console.error("Missing VITE_SUPABASE_ANON_KEY environment variable");
+      return res.status(500).json({ error: 'Server configuration error: Missing Supabase Anon Key' });
+    }
     
     // --- Authentication/Authorization check ---
     const authHeader = req.headers.authorization;
