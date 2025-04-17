@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getStatusBadgeVariant } from "@/lib/utils";
-import InvoiceDetailsModal from "./InvoiceDetailsModal";
+import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 
 type Invoice = {
   id: number;
