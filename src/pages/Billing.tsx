@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2, FileText, AlertCircle, CalendarIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import InvoiceList from "@/components/invoices/InvoiceList";
 import {
   Select,
   SelectContent,
@@ -15,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import InvoiceBatchList from "@/components/billing/InvoiceBatchList";
 
 const Billing = () => {
   const { profile } = useAuth();
@@ -53,9 +53,7 @@ const Billing = () => {
 
   // Calculate billing period dates based on selected month and year
   const getBillingPeriodDates = () => {
-    // Create date from selected year and month
     const billingDate = new Date(parseInt(selectedYear), parseInt(selectedMonth));
-    
     const periodStart = startOfMonth(billingDate);
     const periodEnd = endOfMonth(billingDate);
     
@@ -77,6 +75,25 @@ const Billing = () => {
     }
 
     const billingPeriod = getBillingPeriodDates();
+
+    // Check if a batch already exists for this period
+    const { data: existingBatch } = await supabase
+      .from("invoice_batches")
+      .select("id, status")
+      .eq("society_id", profile.society_id)
+      .eq("billing_period_start", billingPeriod.start)
+      .eq("billing_period_end", billingPeriod.end)
+      .maybeSingle();
+
+    if (existingBatch) {
+      toast({
+        title: "Batch Already Exists",
+        description: `An invoice batch for ${billingPeriod.label} already exists (Status: ${existingBatch.status}).`,
+        variant: "default",
+      });
+      return;
+    }
+
     setIsGenerating(true);
 
     try {
@@ -88,24 +105,19 @@ const Billing = () => {
         }
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      // Show success toast
       toast({
         title: "Success",
-        description: data.message || "Invoices generation initiated successfully.",
+        description: data.message || "Invoice batch generation initiated successfully.",
       });
 
-      console.log("Function response:", data);
     } catch (error) {
       console.error("Error generating invoices:", error);
       
-      // Show error toast
       toast({
-        title: "Invoice Generation Failed",
-        description: error.message || "An error occurred while generating invoices. Please try again.",
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "An error occurred while generating invoice batch.",
         variant: "destructive",
       });
     } finally {
@@ -165,7 +177,7 @@ const Billing = () => {
             ) : (
               <>
                 <FileText className="h-4 w-4" />
-                <span>Generate Invoices for {billingPeriod.label}</span>
+                <span>Generate Batch for {billingPeriod.label}</span>
               </>
             )}
           </Button>
@@ -174,9 +186,9 @@ const Billing = () => {
       
       <Card>
         <CardHeader>
-          <CardTitle>Billing Management</CardTitle>
+          <CardTitle>Invoice Batches</CardTitle>
           <CardDescription>
-            Generate and manage invoices for your society residents
+            Generate and manage invoice batches for your society residents
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -186,24 +198,8 @@ const Billing = () => {
               <span>Please configure your society details before generating invoices.</span>
             </div>
           ) : (
-            <p className="text-muted-foreground">
-              Use the "Generate Invoices" button to create invoices for all active residents for the selected billing period. 
-              The default selection is set to the previous month.
-            </p>
+            <InvoiceBatchList />
           )}
-        </CardContent>
-      </Card>
-
-      {/* Invoices List Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Invoices</CardTitle>
-          <CardDescription>
-            View and manage generated invoices for your society
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <InvoiceList />
         </CardContent>
       </Card>
     </div>

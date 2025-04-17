@@ -16,13 +16,16 @@ port = 54323
 port = 54324
 
 [storage]
-port = 54325
+
 
 [auth]
-port = 54326
+
 
 [realtime]
-port = 54327
+
 
 [functions.generate-invoices]
+verify_jwt = true
+
+[functions.generate-invoice-pdf]
 verify_jwt = true

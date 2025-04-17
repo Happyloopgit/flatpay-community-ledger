@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +17,7 @@ import Residents from "./pages/Residents";
 import Expenses from "./pages/Expenses";
 import Billing from "./pages/Billing";
 import Units from "./pages/Units";
+import BatchDetails from "./pages/billing/BatchDetails"; // <-- CORRECTED PATH
 
 // Layout imports
 import MainLayout from "./components/layout/MainLayout";
@@ -65,6 +65,7 @@ const Root = () => (
             <Route path="/residents" element={<Residents />} />
             <Route path="/expenses" element={<Expenses />} />
             <Route path="/billing" element={<Billing />} />
+            <Route path="/billing/batches/:batchId" element={<BatchDetails />} />
             <Route path="/units" element={<Units />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
