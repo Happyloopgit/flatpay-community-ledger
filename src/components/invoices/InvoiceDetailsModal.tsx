@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
@@ -17,9 +16,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { getStatusBadgeVariant } from "@/lib/utils";
+import { RecordPaymentModal } from "../payments/RecordPaymentModal";
 
 interface InvoiceDetailsModalProps {
   invoiceId: number | null;
@@ -61,6 +62,7 @@ export function InvoiceDetailsModal({
   const [error, setError] = useState<string | null>(null);
   const [invoiceData, setInvoiceData] = useState<InvoiceDetails | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   useEffect(() => {
     async function fetchInvoiceDetails() {
@@ -70,7 +72,6 @@ export function InvoiceDetailsModal({
       setError(null);
 
       try {
-        // Fetch main invoice details
         const { data: invoice, error: invoiceError } = await supabase
           .from("invoices")
           .select(
@@ -86,7 +87,6 @@ export function InvoiceDetailsModal({
 
         if (invoiceError) throw new Error(invoiceError.message);
 
-        // Fetch invoice items
         const { data: items, error: itemsError } = await supabase
           .from("invoice_items")
           .select("*")
@@ -116,6 +116,8 @@ export function InvoiceDetailsModal({
   const formatDate = (date: string) => {
     return format(new Date(date), "MMM d, yyyy");
   };
+
+  const canRecordPayment = invoiceData && invoiceData.status !== "paid";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -218,6 +220,24 @@ export function InvoiceDetailsModal({
                 </TableBody>
               </Table>
             </div>
+
+            {canRecordPayment && (
+              <div className="flex justify-end mt-4">
+                <Button onClick={() => setShowPaymentModal(true)}>
+                  Record Payment
+                </Button>
+              </div>
+            )}
+
+            {invoiceData && (
+              <RecordPaymentModal
+                invoiceId={invoiceData.id}
+                balanceDue={invoiceData.balance_due}
+                open={showPaymentModal}
+                onOpenChange={setShowPaymentModal}
+                onPaymentRecorded={fetchInvoiceDetails}
+              />
+            )}
           </>
         ) : null}
       </DialogContent>

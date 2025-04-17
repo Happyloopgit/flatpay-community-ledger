@@ -289,6 +289,70 @@ export type Database = {
           },
         ]
       }
+      payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: number
+          notes: string | null
+          payment_date: string
+          payment_method: string
+          recorded_by_profile_id: string
+          reference_number: string | null
+          society_id: number
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: number
+          notes?: string | null
+          payment_date?: string
+          payment_method: string
+          recorded_by_profile_id: string
+          reference_number?: string | null
+          society_id: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: number
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string
+          recorded_by_profile_id?: string
+          reference_number?: string | null
+          society_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_recorded_by_profile_id_fkey"
+            columns: ["recorded_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_society_id_fkey"
+            columns: ["society_id"]
+            isOneToOne: false
+            referencedRelation: "societies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -607,6 +671,17 @@ export type Database = {
       get_current_user_profile_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      record_payment: {
+        Args: {
+          p_invoice_id: number
+          p_amount: number
+          p_payment_date: string
+          p_payment_method: string
+          p_reference_number?: string
+          p_notes?: string
+        }
+        Returns: Json
       }
       update_resident: {
         Args: {
