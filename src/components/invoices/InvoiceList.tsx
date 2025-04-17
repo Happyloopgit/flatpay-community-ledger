@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -14,6 +14,8 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { getStatusBadgeVariant } from "@/lib/utils";
+import { InvoiceDetailsModal } from './InvoiceDetailsModal';
 
 type Invoice = {
   id: number;
@@ -36,21 +38,6 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-const getStatusBadgeVariant = (status: string) => {
-  switch (status) {
-    case "paid":
-      return "default";
-    case "pending":
-      return "secondary";
-    case "overdue":
-      return "destructive";
-    case "partially_paid":
-      return "outline";
-    default:
-      return "secondary";
-  }
-};
-
 type InvoiceListProps = {
   filterBatchId?: number;
 };
@@ -58,6 +45,7 @@ type InvoiceListProps = {
 const InvoiceList = ({ filterBatchId }: InvoiceListProps) => {
   const { profile } = useAuth();
   const societyId = profile?.society_id;
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null);
 
   const fetchInvoices = async () => {
     if (!societyId) throw new Error("Society ID not available");
@@ -180,50 +168,64 @@ const InvoiceList = ({ filterBatchId }: InvoiceListProps) => {
   };
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Invoice #</TableHead>
-            <TableHead>Resident</TableHead>
-            <TableHead>Unit</TableHead>
-            <TableHead>Billing Period</TableHead>
-            <TableHead>Due Date</TableHead>
-            <TableHead>Total Amount</TableHead>
-            <TableHead>Amount Paid</TableHead>
-            <TableHead>Balance Due</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {invoices.map((invoice) => (
-            <TableRow key={invoice.id}>
-              <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-              <TableCell>{invoice.resident_name || "N/A"}</TableCell>
-              <TableCell>{formatUnitDisplay(invoice)}</TableCell>
-              <TableCell>
-                {invoice.billing_period_start
-                  ? format(new Date(invoice.billing_period_start), "MMMM yyyy")
-                  : "N/A"}
-              </TableCell>
-              <TableCell>
-                {invoice.due_date
-                  ? format(new Date(invoice.due_date), "MMM d, yyyy")
-                  : "N/A"}
-              </TableCell>
-              <TableCell>{formatCurrency(invoice.total_amount)}</TableCell>
-              <TableCell>{formatCurrency(invoice.amount_paid)}</TableCell>
-              <TableCell>{formatCurrency(invoice.balance_due)}</TableCell>
-              <TableCell>
-                <Badge variant={getStatusBadgeVariant(invoice.status)}>
-                  {invoice.status.replace("_", " ")}
-                </Badge>
-              </TableCell>
+    <>
+      <div className="rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Invoice #</TableHead>
+              <TableHead>Resident</TableHead>
+              <TableHead>Unit</TableHead>
+              <TableHead>Billing Period</TableHead>
+              <TableHead>Due Date</TableHead>
+              <TableHead>Total Amount</TableHead>
+              <TableHead>Amount Paid</TableHead>
+              <TableHead>Balance Due</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {invoices.map((invoice) => (
+              <TableRow
+                key={invoice.id}
+                className="cursor-pointer hover:bg-muted/50"
+                onClick={() => setSelectedInvoiceId(invoice.id)}
+              >
+                <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                <TableCell>{invoice.resident_name || "N/A"}</TableCell>
+                <TableCell>{formatUnitDisplay(invoice)}</TableCell>
+                <TableCell>
+                  {invoice.billing_period_start
+                    ? format(new Date(invoice.billing_period_start), "MMMM yyyy")
+                    : "N/A"}
+                </TableCell>
+                <TableCell>
+                  {invoice.due_date
+                    ? format(new Date(invoice.due_date), "MMM d, yyyy")
+                    : "N/A"}
+                </TableCell>
+                <TableCell>{formatCurrency(invoice.total_amount)}</TableCell>
+                <TableCell>{formatCurrency(invoice.amount_paid)}</TableCell>
+                <TableCell>{formatCurrency(invoice.balance_due)}</TableCell>
+                <TableCell>
+                  <Badge variant={getStatusBadgeVariant(invoice.status)}>
+                    {invoice.status.replace("_", " ")}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <InvoiceDetailsModal
+        invoiceId={selectedInvoiceId}
+        open={selectedInvoiceId !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setSelectedInvoiceId(null);
+        }}
+      />
+    </>
   );
 };
 
