@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
@@ -22,6 +21,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { getStatusBadgeVariant } from "@/lib/utils";
 import { RecordPaymentModal } from "../payments/RecordPaymentModal";
+import type { Payment } from "./types";
 
 interface InvoiceDetailsModalProps {
   invoiceId: number | null;
@@ -64,13 +64,15 @@ export function InvoiceDetailsModal({
   const [invoiceData, setInvoiceData] = useState<InvoiceDetails | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [payments, setPayments] = useState<Payment[] | null>(null);
+  const [paymentsError, setPaymentsError] = useState<string | null>(null);
 
-  // Refactored: Move fetch logic to a standalone function
   const loadInvoiceData = async () => {
     if (!invoiceId) return;
     
     setIsLoading(true);
     setError(null);
+    setPaymentsError(null);
 
     try {
       const { data: invoice, error: invoiceError } = await supabase
@@ -97,6 +99,16 @@ export function InvoiceDetailsModal({
 
       setInvoiceData(invoice);
       setInvoiceItems(items);
+
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from('payments')
+        .select('id, payment_date, amount, payment_method, reference_number, notes')
+        .eq('invoice_id', invoiceId)
+        .order('payment_date', { ascending: false });
+
+      if (paymentsError) throw new Error(paymentsError.message);
+      setPayments(paymentsData);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -105,7 +117,6 @@ export function InvoiceDetailsModal({
   };
 
   useEffect(() => {
-    // Call the refactored function when dependencies change
     if (open && invoiceId) {
       loadInvoiceData();
     }
@@ -224,6 +235,44 @@ export function InvoiceDetailsModal({
                   )}
                 </TableBody>
               </Table>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="text-lg font-semibold mb-4">Recorded Payments</h3>
+              {payments === null ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : paymentsError ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{paymentsError}</AlertDescription>
+                </Alert>
+              ) : payments.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No payments recorded yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Payment Date</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Method</TableHead>
+                      <TableHead>Reference #</TableHead>
+                      <TableHead>Notes</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payments.map((payment) => (
+                      <TableRow key={payment.id}>
+                        <TableCell>{formatDate(payment.payment_date)}</TableCell>
+                        <TableCell>{formatCurrency(payment.amount)}</TableCell>
+                        <TableCell>{payment.payment_method}</TableCell>
+                        <TableCell>{payment.reference_number || '-'}</TableCell>
+                        <TableCell>{payment.notes || '-'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </div>
 
             {canRecordPayment && (
