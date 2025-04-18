@@ -17,9 +17,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { supabase } from "@/lib/supabase";
 import { getStatusBadgeVariant } from "@/lib/utils";
+import { RecordPaymentModal } from "../payments/RecordPaymentModal";
 
 interface InvoiceDetailsModalProps {
   invoiceId: number | null;
@@ -61,49 +63,52 @@ export function InvoiceDetailsModal({
   const [error, setError] = useState<string | null>(null);
   const [invoiceData, setInvoiceData] = useState<InvoiceDetails | null>(null);
   const [invoiceItems, setInvoiceItems] = useState<InvoiceItem[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  // Refactored: Move fetch logic to a standalone function
+  const loadInvoiceData = async () => {
+    if (!invoiceId) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data: invoice, error: invoiceError } = await supabase
+        .from("invoices")
+        .select(
+          `*, 
+           residents(name),
+           units(
+             unit_number,
+             society_blocks(block_name)
+           )`
+        )
+        .eq("id", invoiceId)
+        .single();
+
+      if (invoiceError) throw new Error(invoiceError.message);
+
+      const { data: items, error: itemsError } = await supabase
+        .from("invoice_items")
+        .select("*")
+        .eq("invoice_id", invoiceId);
+
+      if (itemsError) throw new Error(itemsError.message);
+
+      setInvoiceData(invoice);
+      setInvoiceItems(items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function fetchInvoiceDetails() {
-      if (!open || !invoiceId) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        // Fetch main invoice details
-        const { data: invoice, error: invoiceError } = await supabase
-          .from("invoices")
-          .select(
-            `*, 
-             residents(name),
-             units(
-               unit_number,
-               society_blocks(block_name)
-             )`
-          )
-          .eq("id", invoiceId)
-          .single();
-
-        if (invoiceError) throw new Error(invoiceError.message);
-
-        // Fetch invoice items
-        const { data: items, error: itemsError } = await supabase
-          .from("invoice_items")
-          .select("*")
-          .eq("invoice_id", invoiceId);
-
-        if (itemsError) throw new Error(itemsError.message);
-
-        setInvoiceData(invoice);
-        setInvoiceItems(items);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
-      } finally {
-        setIsLoading(false);
-      }
+    // Call the refactored function when dependencies change
+    if (open && invoiceId) {
+      loadInvoiceData();
     }
-
-    fetchInvoiceDetails();
   }, [invoiceId, open]);
 
   const formatCurrency = (amount: number) => {
@@ -116,6 +121,8 @@ export function InvoiceDetailsModal({
   const formatDate = (date: string) => {
     return format(new Date(date), "MMM d, yyyy");
   };
+
+  const canRecordPayment = invoiceData && invoiceData.status !== "paid";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -218,6 +225,24 @@ export function InvoiceDetailsModal({
                 </TableBody>
               </Table>
             </div>
+
+            {canRecordPayment && (
+              <div className="flex justify-end mt-4">
+                <Button onClick={() => setShowPaymentModal(true)}>
+                  Record Payment
+                </Button>
+              </div>
+            )}
+
+            {invoiceData && (
+              <RecordPaymentModal
+                invoiceId={invoiceData.id}
+                balanceDue={invoiceData.balance_due}
+                open={showPaymentModal}
+                onOpenChange={setShowPaymentModal}
+                onPaymentRecorded={loadInvoiceData}
+              />
+            )}
           </>
         ) : null}
       </DialogContent>
