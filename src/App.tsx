@@ -17,7 +17,8 @@ import Residents from "./pages/Residents";
 import Expenses from "./pages/Expenses";
 import Billing from "./pages/Billing";
 import Units from "./pages/Units";
-import BatchDetails from "./pages/billing/BatchDetails"; // <-- CORRECTED PATH
+import BatchDetails from "./pages/billing/BatchDetails";
+import Reports from "./pages/Reports";
 
 // Layout imports
 import MainLayout from "./components/layout/MainLayout";
@@ -67,6 +68,7 @@ const Root = () => (
             <Route path="/billing" element={<Billing />} />
             <Route path="/billing/batches/:batchId" element={<BatchDetails />} />
             <Route path="/units" element={<Units />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>
