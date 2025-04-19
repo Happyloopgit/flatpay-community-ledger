@@ -25,6 +25,14 @@ type Resident = {
   unit: Unit;
 };
 
+type AllocatableExpense = {
+  id: number;
+  expense_date: string;
+  description: string | null;
+  amount: number;
+  allocation_rule: string;
+};
+
 serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -204,6 +212,29 @@ serve(async (req: Request) => {
       console.log('No active recurring charges found for this society.');
     }
 
+    // NEW: Fetch expenses that are allocatable and not yet allocated
+    const { data: allocatableExpenses, error: expensesError } = await supabase
+      .from('expenses')
+      .select('id, expense_date, description, amount, allocation_rule')
+      .eq('society_id', society_id)
+      .eq('is_allocated_to_bill', false)
+      .in('allocation_rule', ['allocate_equal_all', 'allocate_by_sqft_all'])
+      .gte('expense_date', billing_period_start)
+      .lte('expense_date', billing_period_end);
+
+    if (expensesError) {
+      console.error("Error fetching allocatable expenses:", expensesError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: `Error fetching allocatable expenses: ${expensesError.message}` 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Found ${allocatableExpenses?.length || 0} allocatable expenses for the period`);
+
     // Fetch active residents with their associated units
     const { data: residents, error: residentsError } = await supabase
       .from('residents')
@@ -246,6 +277,36 @@ serve(async (req: Request) => {
 
     // After fetching residents
     console.log(`Found ${formattedResidents.length} active residents with assigned units.`);
+
+    // NEW: Calculate allocation values for expenses
+    const activeUnitCount = formattedResidents.length;
+    
+    // Calculate total square footage of all active units
+    const totalActiveSqft = formattedResidents.reduce((total, resident) => {
+      return total + (resident.unit.size_sqft || 0);
+    }, 0);
+    
+    console.log(`Total active units: ${activeUnitCount}, Total active sq.ft: ${totalActiveSqft}`);
+    
+    // Group and sum allocatable expenses by rule
+    const equalAllocationTotal = allocatableExpenses
+      ? allocatableExpenses
+        .filter(exp => exp.allocation_rule === 'allocate_equal_all')
+        .reduce((sum, exp) => sum + exp.amount, 0)
+      : 0;
+      
+    const sqftAllocationTotal = allocatableExpenses
+      ? allocatableExpenses
+        .filter(exp => exp.allocation_rule === 'allocate_by_sqft_all')
+        .reduce((sum, exp) => sum + exp.amount, 0)
+      : 0;
+    
+    // Calculate per-unit shares
+    const equalSharePerUnit = activeUnitCount > 0 ? equalAllocationTotal / activeUnitCount : 0;
+    const ratePerSqft = totalActiveSqft > 0 ? sqftAllocationTotal / totalActiveSqft : 0;
+    
+    console.log(`Equal allocation total: ${equalAllocationTotal}, Per-unit equal share: ${equalSharePerUnit}`);
+    console.log(`Sqft allocation total: ${sqftAllocationTotal}, Rate per sqft: ${ratePerSqft}`);
 
     // Calculate generation date and due date
     const generationDate = new Date();
@@ -290,16 +351,19 @@ serve(async (req: Request) => {
     let totalBatchAmount = 0;
     const failedInvoices: { residentId: number, reason: string }[] = [];
 
+    // Track expense IDs that were successfully allocated
+    const allocatedExpenseIds: number[] = [];
+
     // Loop through residents and create invoices
     for (const resident of formattedResidents) {
       console.log(`Processing resident ID: ${resident.id}, Unit ID: ${resident.unit.id}, Unit Number: ${resident.unit.unit_number}`);
 
       // Calculate charges and build invoice items
-      const invoiceItems: { description: string, amount: number, related_charge_id: string }[] = [];
+      const invoiceItems: { description: string, amount: number, related_charge_id?: string, related_expense_id?: number }[] = [];
       let totalAmount = 0;
 
       // Process each recurring charge
-      for (const charge of charges) {
+      for (const charge of charges || []) {
         let itemAmount = 0;
 
         console.log(`Evaluating charge: ${charge.charge_name} (${charge.calculation_type})`);
@@ -334,6 +398,29 @@ serve(async (req: Request) => {
         });
         
         totalAmount += itemAmount;
+      }
+
+      // NEW: Apply equal allocation share to this resident
+      if (equalSharePerUnit > 0) {
+        const roundedEqualShare = parseFloat(equalSharePerUnit.toFixed(2));
+        invoiceItems.push({
+          description: `Common Expenses (Equal Share) - ${allocatableExpenses?.filter(e => e.allocation_rule === 'allocate_equal_all').length} items`,
+          amount: roundedEqualShare
+        });
+        totalAmount += roundedEqualShare;
+        console.log(` Adding equal allocation share: ${roundedEqualShare}`);
+      }
+
+      // NEW: Apply sqft-based allocation if unit has sqft data
+      if (ratePerSqft > 0 && resident.unit.size_sqft) {
+        const sqftShare = ratePerSqft * resident.unit.size_sqft;
+        const roundedSqftShare = parseFloat(sqftShare.toFixed(2));
+        invoiceItems.push({
+          description: `Common Expenses (Sqft Share @ ${ratePerSqft.toFixed(4)}/sqft) - ${allocatableExpenses?.filter(e => e.allocation_rule === 'allocate_by_sqft_all').length} items`,
+          amount: roundedSqftShare
+        });
+        totalAmount += roundedSqftShare;
+        console.log(` Adding sqft allocation share: ${roundedSqftShare} (${resident.unit.size_sqft} sqft)`);
       }
 
       // Log invoice details before insertion
@@ -393,7 +480,8 @@ serve(async (req: Request) => {
               invoice_id: invoice.id,
               description: item.description,
               amount: item.amount,
-              related_charge_id: item.related_charge_id
+              related_charge_id: item.related_charge_id,
+              // We're not tracking individual expense relation in items since they're aggregated
             });
 
           if (itemError) {
@@ -428,6 +516,21 @@ serve(async (req: Request) => {
       }
     }
 
+    // NEW: Mark expenses as allocated only if we successfully created at least one invoice
+    if (createdInvoiceCount > 0 && allocatableExpenses && allocatableExpenses.length > 0) {
+      const expenseIds = allocatableExpenses.map(exp => exp.id);
+      const { error: allocUpdateError } = await supabase
+        .from('expenses')
+        .update({ is_allocated_to_bill: true })
+        .in('id', expenseIds);
+
+      if (allocUpdateError) {
+        console.error("Error marking expenses as allocated:", allocUpdateError);
+      } else {
+        console.log(`Marked ${expenseIds.length} expenses as allocated to billing`);
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true,
@@ -441,6 +544,11 @@ serve(async (req: Request) => {
           batch_id: batch.id,
           invoices_created: createdInvoiceCount,
           total_amount: totalBatchAmount,
+          allocated_expenses: allocatableExpenses ? {
+            count: allocatableExpenses.length,
+            equal_allocation_total: equalAllocationTotal,
+            sqft_allocation_total: sqftAllocationTotal
+          } : null,
           failed_invoices: failedInvoices,
           generation_date: formattedGenerationDate,
           due_date: formattedDueDate
