@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar as SidebarContainer,
@@ -17,6 +16,7 @@ import {
   DollarSign,
   Settings,
   Home,
+  BarChart,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,11 @@ const navigationItems = [
     name: "Settings", 
     icon: <Settings className="h-5 w-5" />, 
     path: "/settings" 
+  },
+  { 
+    name: "Reports", 
+    icon: <BarChart className="h-5 w-5" />, 
+    path: "/reports" 
   },
 ];
 
