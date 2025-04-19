@@ -8,6 +8,11 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+console.log("==env==", process.env);
+console.log("==supabaseUrl==", supabaseUrl);
+console.log("==supabaseAnonKey==", supabaseAnonKey);
+console.log("==supabaseServiceKey==", supabaseServiceKey);
+
 // Helper function to format currency
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-IN', {
