@@ -117,6 +117,17 @@ const MemberLedgerTab: React.FC = () => {
     setError(null);
 
     try {
+      // Convert selectedResidentId from string to number
+      const numericResidentId = parseInt(selectedResidentId, 10);
+      
+      if (isNaN(numericResidentId)) {
+        throw new Error("Invalid resident ID");
+      }
+      
+      console.log('Selected Resident ID (string):', selectedResidentId);
+      console.log('Selected Resident ID (number):', numericResidentId);
+      console.log('Selected Dates:', { startDate, endDate });
+
       // Format dates for queries
       const formattedStartDate = format(startDate, 'yyyy-MM-dd');
       const formattedEndDate = format(endDate, 'yyyy-MM-dd');
@@ -125,13 +136,24 @@ const MemberLedgerTab: React.FC = () => {
       const { data: previousInvoices, error: invError } = await supabase
         .from('invoices')
         .select('total_amount')
-        .eq('resident_id', selectedResidentId)
+        .eq('resident_id', numericResidentId)
         .lt('generation_date', formattedStartDate);
 
+      // Create a subquery to get invoice IDs for this resident
+      const { data: invoiceIds, error: idError } = await supabase
+        .from('invoices')
+        .select('id')
+        .eq('resident_id', numericResidentId);
+        
+      if (idError) throw idError;
+      
+      // Use the invoice IDs to query payments
+      const invoiceIdArray = invoiceIds?.map(inv => inv.id) || [];
+      
       const { data: previousPayments, error: payError } = await supabase
         .from('payments')
         .select('amount')
-        .eq('invoice_id', supabase.from('invoices').select('id').eq('resident_id', selectedResidentId))
+        .in('invoice_id', invoiceIdArray)
         .lt('payment_date', formattedStartDate);
 
       if (invError) throw invError;
@@ -142,24 +164,31 @@ const MemberLedgerTab: React.FC = () => {
       const totalPayments = previousPayments?.reduce((sum, pay) => sum + (pay.amount || 0), 0) ?? 0;
       const calculatedOpeningBalance = totalInvoices - totalPayments;
       setOpeningBalance(calculatedOpeningBalance);
+      
+      console.log('Calculated Opening Balance:', calculatedOpeningBalance);
 
       // Fetch transactions within date range
       const { data: invoices, error: currInvError } = await supabase
         .from('invoices')
         .select('id, invoice_number, generation_date, total_amount')
-        .eq('resident_id', selectedResidentId)
+        .eq('resident_id', numericResidentId)
         .gte('generation_date', formattedStartDate)
         .lte('generation_date', formattedEndDate);
 
       const { data: payments, error: currPayError } = await supabase
         .from('payments')
         .select('id, payment_date, amount, reference_number')
-        .eq('invoice_id', supabase.from('invoices').select('id').eq('resident_id', selectedResidentId))
+        .in('invoice_id', invoiceIdArray)
         .gte('payment_date', formattedStartDate)
         .lte('payment_date', formattedEndDate);
 
       if (currInvError) throw currInvError;
       if (currPayError) throw currPayError;
+      
+      console.log('Fetched Transactions:', { 
+        invoices: invoices?.length || 0, 
+        payments: payments?.length || 0
+      });
 
       // Combine and sort transactions
       let entries: LedgerEntry[] = [];
@@ -194,6 +223,8 @@ const MemberLedgerTab: React.FC = () => {
         ...entry,
         balance: balance = balance + (entry.charge || 0) - (entry.payment || 0)
       }));
+      
+      console.log('Final Ledger Entries:', entries);
 
       setLedgerEntries(entries);
     } catch (err) {
